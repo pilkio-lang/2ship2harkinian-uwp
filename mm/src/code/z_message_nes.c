@@ -228,9 +228,9 @@ void Message_LoadTimeNES(PlayState* play, u8 curChar, s32* offset, f32* arg3, s1
 #define MILK_ROAD_STR "Route du Lait"
 #define WOODFALL_STR "Bois-Cascade"
 #define SOUTHERN_SWAMP_STR "Marais du Sud"
-#define IKANA_CANYON_STR "Vall\\x9D" "e Ikana"
+#define IKANA_CANYON_STR "Vall\x9D" "e Ikana"
 #define STONE_TOWER_STR "Forteresse de Pierre"
-#define ENTRANCE_STR "Entr\\x9D" "e"
+#define ENTRANCE_STR "Entr\x9D" "e"
 
 char sOwlWarpTextENG[OWL_WARP_MAX][32] = {
     GREAT_BAY_COAST_STR,  // OWL_WARP_GREAT_BAY_COAST
