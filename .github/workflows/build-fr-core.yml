@@ -1,0 +1,90 @@
+name: build-fr-xbox-core
+
+on:
+  push:
+    branches:
+      - fr-game-runtime-v2
+  workflow_dispatch:
+
+jobs:
+  generate-2ship-otr:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout exact FR branch
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y $(cat .github/workflows/apt-deps.txt) libzip-dev zipcmp zipmerge ziptool ninja-build
+
+      - name: Build 2ship.o2r
+        run: |
+          cmake --no-warn-unused-cli -H. -Bbuild-otr -GNinja -DCMAKE_BUILD_TYPE:STRING=Release
+          cmake --build build-otr --config Release --target Generate2ShipOtr -j3
+
+      - name: Upload 2ship.o2r
+        uses: actions/upload-artifact@v4
+        with:
+          name: fr-2ship-o2r
+          path: 2ship.o2r
+          retention-days: 7
+
+  build-fr-core:
+    needs: generate-2ship-otr
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact FR branch
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Ninja
+        run: choco install ninja -y
+
+      - name: Configure MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Download generated 2ship.o2r
+        uses: actions/download-artifact@v4
+        with:
+          name: fr-2ship-o2r
+          path: build-windows/mm
+
+      - name: Configure core
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+        run: |
+          cmake -S . -B build-windows -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_BUILD_TYPE:STRING=Release
+
+      - name: Build FR 2ship.dll
+        run: |
+          cmake --build build-windows --config Release --parallel 10 --target 2ship
+
+      - name: Stage FR core
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path fr-core | Out-Null
+          $dll = Get-ChildItem -Path build-windows -Recurse -Filter 2ship.dll | Select-Object -First 1
+          $lib = Get-ChildItem -Path build-windows -Recurse -Filter 2ship.lib | Select-Object -First 1
+          $pdb = Get-ChildItem -Path build-windows -Recurse -Filter 2ship.pdb | Select-Object -First 1
+          if (-not $dll) { throw "2ship.dll introuvable apres compilation." }
+          Copy-Item $dll.FullName fr-core\2ship.dll
+          if ($lib) { Copy-Item $lib.FullName fr-core\2ship.lib }
+          if ($pdb) { Copy-Item $pdb.FullName fr-core\2ship.pdb }
+          @(
+            "Branch: ${{ github.ref_name }}"
+            "Commit: ${{ github.sha }}"
+            "Source baseline: 0e1966ffbdc5baafb3689894d73f5c469bdd0a62"
+            "Purpose: French in-game runtime strings for Xbox/UWP"
+          ) | Set-Content -Encoding UTF8 fr-core\BUILD_INFO.txt
+          Get-ChildItem fr-core
+
+      - name: Upload FR Xbox core
+        uses: actions/upload-artifact@v4
+        with:
+          name: 2ship-fr-xbox-core
+          path: fr-core
+          retention-days: 7
