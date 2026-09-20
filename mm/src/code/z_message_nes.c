@@ -68,45 +68,61 @@ void Message_LoadCharNES(PlayState* play, u8 codePointIndex, s32* offset, f32* a
     *arg3 = temp2;
 }
 
+
+// #region 2S2H-FR [French game runtime]
+// French ordinal suffixes backported from PAL behavior.
+// 0x9C is 'è' in the NES/PAL message font.
+static void Message_LoadFrenchOrdinalSuffixNES(PlayState* play, s32* charTexIndexPtr, f32* arg2,
+                                                s16* decodedBufPosPtr, s32 number) {
+    s16 decodedBufPos = *decodedBufPosPtr;
+    s32 charTexIndex = *charTexIndexPtr;
+    f32 temp = *arg2;
+
+    if (number == 1) {
+        Message_LoadCharNES(play, 0x9C, &charTexIndex, &temp, decodedBufPos);
+        decodedBufPos++;
+        Message_LoadCharNES(play, 'r', &charTexIndex, &temp, decodedBufPos);
+        decodedBufPos++;
+        Message_LoadCharNES(play, 'e', &charTexIndex, &temp, decodedBufPos);
+    } else if (number == 2) {
+        Message_LoadCharNES(play, 0x9C, &charTexIndex, &temp, decodedBufPos);
+        decodedBufPos++;
+        Message_LoadCharNES(play, 'm', &charTexIndex, &temp, decodedBufPos);
+        decodedBufPos++;
+        Message_LoadCharNES(play, 'e', &charTexIndex, &temp, decodedBufPos);
+    } else {
+        Message_LoadCharNES(play, 'e', &charTexIndex, &temp, decodedBufPos);
+    }
+
+    *decodedBufPosPtr = decodedBufPos;
+    *charTexIndexPtr = charTexIndex;
+    *arg2 = temp;
+}
+// #endregion
+
 void Message_LoadPluralRupeesNES(PlayState* play, s16* decodedBufPos, s32* offset, f32* arg3) {
     MessageContext* msgCtx = &play->msgCtx;
     s16 p = *decodedBufPos;
     s32 o = *offset;
     f32 f = *arg3;
+    static const char rubis[] = "Rubis";
+    s32 i;
 
-    msgCtx->decodedBuffer.schar[p] = ' ';
-    p++;
-    Font_LoadCharNES(play, 'R', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'R';
-    p++;
-    Font_LoadCharNES(play, 'u', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'u';
-    p++;
-    Font_LoadCharNES(play, 'p', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'p';
-    p++;
-    Font_LoadCharNES(play, 'e', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'e';
-    p++;
-    Font_LoadCharNES(play, 'e', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'e';
-    p++;
-    Font_LoadCharNES(play, 's', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 's';
+    msgCtx->decodedBuffer.schar[p++] = ' ';
+    for (i = 0; rubis[i] != '\0'; i++, p++) {
+        Font_LoadCharNES(play, rubis[i], o);
+        o += FONT_CHAR_TEX_SIZE;
+        msgCtx->decodedBuffer.schar[p] = rubis[i];
+    }
 
-    f += 16.0f * msgCtx->textCharScale * 6.0f;
+    p--;
+    f += 16.0f * msgCtx->textCharScale * 5.0f;
     *decodedBufPos = p;
     *offset = o;
     *arg3 = f;
 }
 
-#define RUPEES_STR_EN "Rupee(s)"
+#define RUPEES_STR_EN "Rubis"
 #define RUPEES_STR_DE "Rubin(e)"
 #define RUPEES_STR_FR "Rubis"
 #define RUPEES_STR_SPA "Rupia(s)"
@@ -150,46 +166,8 @@ void Message_LoadLocalizedRupeesNES(PlayState* play, s16* decodedBufPos, s32* of
 }
 
 void Message_LoadRupeesNES(PlayState* play, s16* decodedBufPos, s32* offset, f32* arg3, s16 singular) {
-    MessageContext* msgCtx = &play->msgCtx;
-    s16 p = *decodedBufPos;
-    s32 o = *offset;
-    f32 f = *arg3;
-
-    msgCtx->decodedBuffer.schar[p] = ' ';
-    p++;
-    Font_LoadCharNES(play, 'R', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'R';
-    p++;
-    Font_LoadCharNES(play, 'u', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'u';
-    p++;
-    Font_LoadCharNES(play, 'p', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'p';
-    p++;
-    Font_LoadCharNES(play, 'e', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'e';
-    p++;
-    Font_LoadCharNES(play, 'e', o);
-    o += FONT_CHAR_TEX_SIZE;
-    msgCtx->decodedBuffer.schar[p] = 'e';
-
-    if (singular != 1) {
-        p++;
-        Font_LoadCharNES(play, 's', o);
-        o += FONT_CHAR_TEX_SIZE;
-        msgCtx->decodedBuffer.schar[p] = 's';
-        f += 16.0f * msgCtx->textCharScale * 6.0f;
-    } else {
-        f += 16.0f * msgCtx->textCharScale * 5.0f;
-    }
-
-    *decodedBufPos = p;
-    *offset = o;
-    *arg3 = f;
+    (void)singular;
+    Message_LoadPluralRupeesNES(play, decodedBufPos, offset, arg3);
 }
 
 void Message_LoadTimeNES(PlayState* play, u8 curChar, s32* offset, f32* arg3, s16* decodedBufPos) {
@@ -242,19 +220,19 @@ void Message_LoadTimeNES(PlayState* play, u8 curChar, s32* offset, f32* arg3, s1
     *arg3 = f;
 }
 
-#define GREAT_BAY_COAST_STR "Great Bay Coast"
-#define ZORA_CAPE_STR "Zora Cape"
-#define SNOWHEAD_STR "Snowhead"
-#define MOUNTAIN_VILLAGE_STR "Mountain Village"
-#define CLOCK_TOWN_STR "Clock Town"
-#define MILK_ROAD_STR "Milk Road"
-#define WOODFALL_STR "Woodfall"
-#define SOUTHERN_SWAMP_STR "Southern Swamp"
-#define IKANA_CANYON_STR "Ikana Canyon"
-#define STONE_TOWER_STR "Stone Tower"
-#define ENTRANCE_STR "Entrance"
+#define GREAT_BAY_COAST_STR "Plage de la Grande Baie"
+#define ZORA_CAPE_STR "Cap Zora"
+#define SNOWHEAD_STR "Pic des Neiges"
+#define MOUNTAIN_VILLAGE_STR "Village dans la montagne"
+#define CLOCK_TOWN_STR "Bourg-Clocher"
+#define MILK_ROAD_STR "Route du Lait"
+#define WOODFALL_STR "Bois-Cascade"
+#define SOUTHERN_SWAMP_STR "Marais du Sud"
+#define IKANA_CANYON_STR "Vall\\x9D" "e Ikana"
+#define STONE_TOWER_STR "Forteresse de Pierre"
+#define ENTRANCE_STR "Entr\\x9D" "e"
 
-char sOwlWarpTextENG[OWL_WARP_MAX][16] = {
+char sOwlWarpTextENG[OWL_WARP_MAX][32] = {
     GREAT_BAY_COAST_STR,  // OWL_WARP_GREAT_BAY_COAST
     ZORA_CAPE_STR,        // OWL_WARP_ZORA_CAPE
     SNOWHEAD_STR,         // OWL_WARP_SNOWHEAD
@@ -997,10 +975,10 @@ void Message_DrawTextNES(PlayState* play, Gfx** gfxP, u16 textDrawPos) {
     *gfxP = gfx;
 }
 
-char sTimeSpeedTextENG[][4] = {
-    "Fast",
+char sTimeSpeedTextENG[][5] = {
+    "Vite",
     "----",
-    "Slow",
+    "Lent",
 };
 
 u8 sMaskCodeColorCmdENG[] = {
@@ -1010,10 +988,10 @@ u8 sMaskCodeColorCmdENG[] = {
     MESSAGE_COLOR_GREEN,
 };
 
-#define RED_STR "RED"
-#define BLUE_STR "BLUE"
-#define YELLOW_STR "YELLOW"
-#define GREEN_STR "GREEN"
+#define RED_STR "ROUGE"
+#define BLUE_STR "BLEU"
+#define YELLOW_STR "JAUNE"
+#define GREEN_STR "VERT"
 
 char sMaskCodeTextENG[][6] = {
     RED_STR,
@@ -1372,32 +1350,9 @@ void Message_DecodeNES(PlayState* play) {
                 }
             }
 
-            if ((gSaveContext.save.saveInfo.inventory.strayFairies[(void)0, gSaveContext.dungeonSceneSharedIndex] ==
-                 1) ||
-                (gSaveContext.save.saveInfo.inventory.strayFairies[(void)0, gSaveContext.dungeonSceneSharedIndex] ==
-                 21)) {
-                Message_LoadCharNES(play, 's', &charTexIndex, &spA4, decodedBufPos);
-                decodedBufPos++;
-                Message_LoadCharNES(play, 't', &charTexIndex, &spA4, decodedBufPos);
-            } else if ((gSaveContext.save.saveInfo.inventory
-                            .strayFairies[(void)0, gSaveContext.dungeonSceneSharedIndex] == 2) ||
-                       (gSaveContext.save.saveInfo.inventory
-                            .strayFairies[(void)0, gSaveContext.dungeonSceneSharedIndex] == 22)) {
-                Message_LoadCharNES(play, 'n', &charTexIndex, &spA4, decodedBufPos);
-                decodedBufPos++;
-                Message_LoadCharNES(play, 'd', &charTexIndex, &spA4, decodedBufPos);
-            } else if ((gSaveContext.save.saveInfo.inventory
-                            .strayFairies[(void)0, gSaveContext.dungeonSceneSharedIndex] == 3) ||
-                       (gSaveContext.save.saveInfo.inventory
-                            .strayFairies[(void)0, gSaveContext.dungeonSceneSharedIndex] == 23)) {
-                Message_LoadCharNES(play, 'r', &charTexIndex, &spA4, decodedBufPos);
-                decodedBufPos++;
-                Message_LoadCharNES(play, 'd', &charTexIndex, &spA4, decodedBufPos);
-            } else {
-                Message_LoadCharNES(play, 't', &charTexIndex, &spA4, decodedBufPos);
-                decodedBufPos++;
-                Message_LoadCharNES(play, 'h', &charTexIndex, &spA4, decodedBufPos);
-            }
+            Message_LoadFrenchOrdinalSuffixNES(
+                play, &charTexIndex, &spA4, &decodedBufPos,
+                gSaveContext.save.saveInfo.inventory.strayFairies[(void)0, gSaveContext.dungeonSceneSharedIndex]);
         } else if (curChar == MESSAGE_TOKENS) {
             digits[0] = digits[1] = 0;
             digits[2] = Inventory_GetSkullTokenCount(play->sceneId);
@@ -1422,26 +1377,8 @@ void Message_DecodeNES(PlayState* play) {
                 }
             }
 
-            if ((Inventory_GetSkullTokenCount(play->sceneId) == 1) ||
-                (Inventory_GetSkullTokenCount(play->sceneId) == 21)) {
-                Message_LoadCharNES(play, 's', &charTexIndex, &spA4, decodedBufPos);
-                decodedBufPos++;
-                Message_LoadCharNES(play, 't', &charTexIndex, &spA4, decodedBufPos);
-            } else if ((Inventory_GetSkullTokenCount(play->sceneId) == 2) ||
-                       (Inventory_GetSkullTokenCount(play->sceneId) == 22)) {
-                Message_LoadCharNES(play, 'n', &charTexIndex, &spA4, decodedBufPos);
-                decodedBufPos++;
-                Message_LoadCharNES(play, 'd', &charTexIndex, &spA4, decodedBufPos);
-            } else if ((Inventory_GetSkullTokenCount(play->sceneId) == 3) ||
-                       (Inventory_GetSkullTokenCount(play->sceneId) == 23)) {
-                Message_LoadCharNES(play, 'r', &charTexIndex, &spA4, decodedBufPos);
-                decodedBufPos++;
-                Message_LoadCharNES(play, 'd', &charTexIndex, &spA4, decodedBufPos);
-            } else {
-                Message_LoadCharNES(play, 't', &charTexIndex, &spA4, decodedBufPos);
-                decodedBufPos++;
-                Message_LoadCharNES(play, 'h', &charTexIndex, &spA4, decodedBufPos);
-            }
+            Message_LoadFrenchOrdinalSuffixNES(
+                play, &charTexIndex, &spA4, &decodedBufPos, Inventory_GetSkullTokenCount(play->sceneId));
         } else if (curChar == MESSAGE_POINTS_TENS) {
             digits[0] = 0;
             digits[1] = gSaveContext.minigameScore;
@@ -1702,6 +1639,11 @@ void Message_DecodeNES(PlayState* play) {
 
             msgCtx->decodedBuffer.schar[decodedBufPos] = 0;
         } else if (curChar == MESSAGE_HOURS_UNTIL_MOON_CRASH) {
+            static const char heure[] = "heure";
+            static const char heures[] = "heures";
+            const char* unit;
+            s16 unitIndex;
+
             timeToMoonCrash = TIME_UNTIL_MOON_CRASH;
             digits[0] = 0;
             digits[1] = TIME_TO_HOURS_F_ALT(timeToMoonCrash);
@@ -1721,19 +1663,13 @@ void Message_DecodeNES(PlayState* play) {
                     decodedBufPos++;
                 }
             }
-            msgCtx->decodedBuffer.schar[decodedBufPos] = ' ';
-            decodedBufPos++;
-            Message_LoadCharNES(play, 'h', &charTexIndex, &spA4, decodedBufPos);
-            decodedBufPos++;
-            Message_LoadCharNES(play, 'o', &charTexIndex, &spA4, decodedBufPos);
-            decodedBufPos++;
-            Message_LoadCharNES(play, 'u', &charTexIndex, &spA4, decodedBufPos);
-            decodedBufPos++;
-            Message_LoadCharNES(play, 'r', &charTexIndex, &spA4, decodedBufPos);
-            if ((digits[0] != 0) || (digits[1] != 1)) {
-                decodedBufPos++;
-                Message_LoadCharNES(play, 's', &charTexIndex, &spA4, decodedBufPos);
+
+            msgCtx->decodedBuffer.schar[decodedBufPos++] = ' ';
+            unit = ((digits[0] == 0) && (digits[1] == 1)) ? heure : heures;
+            for (unitIndex = 0; unit[unitIndex] != '\0'; unitIndex++, decodedBufPos++) {
+                Message_LoadCharNES(play, unit[unitIndex], &charTexIndex, &spA4, decodedBufPos);
             }
+            decodedBufPos--;
         } else if (curChar == MESSAGE_TIME_UNTIL_NEW_DAY) {
             Message_LoadTimeNES(play, curChar, &charTexIndex, &spA4, &decodedBufPos);
         } else if ((curChar == MESSAGE_HS_POINTS_BANK_RUPEES) || (curChar == MESSAGE_HS_POINTS_UNK_1) ||
