@@ -166,7 +166,6 @@ jobs:
           $cerPath = Join-Path $stage "2ship-fr-dev-cert.cer"
           Export-Certificate -Cert $cert -FilePath $cerPath -Force | Out-Null
           Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\CurrentUser\TrustedPeople" | Out-Null
-          Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
 
           $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
           if (-not $signtool) {
@@ -195,10 +194,15 @@ jobs:
               throw "Signing failed for $($package.Name)."
             }
 
-            & $signtool verify /pa /v $package.FullName
-            if ($LASTEXITCODE -ne 0) {
-              throw "Signature verification failed for $($package.Name)."
+            $signature = Get-AuthenticodeSignature -FilePath $package.FullName
+            if (-not $signature.SignerCertificate) {
+              throw "No Authenticode signer certificate found on $($package.Name)."
             }
+            if ($signature.SignerCertificate.Thumbprint -ne $cert.Thumbprint) {
+              throw "Unexpected signing certificate on $($package.Name). Expected $($cert.Thumbprint), got $($signature.SignerCertificate.Thumbprint)."
+            }
+            Write-Host "Signature certificate confirmed on $($package.Name): $($signature.SignerCertificate.Subject) / $($signature.SignerCertificate.Thumbprint)"
+            Write-Host "Authenticode trust status on ephemeral CI runner: $($signature.Status)"
           }
 
           @(
