@@ -47,35 +47,20 @@ jobs:
         run: |
           cmake --build build_vanilla --config Release --target 2ship --parallel 8
 
-      - name: Stage core for UWP project
+      - name: Verify core outputs for UWP project
         shell: pwsh
         run: |
-          $out = Join-Path $env:GITHUB_WORKSPACE "x64\Release"
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $coreDir = Join-Path $env:GITHUB_WORKSPACE "x64\Release"
+          $dll = Join-Path $coreDir "2ship.dll"
+          $lib = Join-Path $coreDir "2ship.lib"
+          $pdb = Join-Path $coreDir "2ship.pdb"
 
-          $dll = Get-ChildItem -Path build_vanilla -Recurse -File -Filter 2ship.dll |
-            Where-Object { $_.FullName -notmatch '\\_deps\\' } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          $lib = Get-ChildItem -Path build_vanilla -Recurse -File -Filter 2ship.lib |
-            Where-Object { $_.FullName -notmatch '\\_deps\\' } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          $pdb = Get-ChildItem -Path build_vanilla -Recurse -File -Filter 2ship.pdb |
-            Where-Object { $_.FullName -notmatch '\\_deps\\' } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
+          if (-not (Test-Path $dll)) { throw "Expected core DLL is missing: $dll" }
+          if (-not (Test-Path $lib)) { throw "Expected import library is missing: $lib" }
 
-          if (-not $dll) { throw "2ship.dll not found after successful CMake build." }
-          if (-not $lib) { throw "2ship.lib not found after successful CMake build." }
-
-          Copy-Item $dll.FullName (Join-Path $out "2ship.dll") -Force
-          Copy-Item $lib.FullName (Join-Path $out "2ship.lib") -Force
-          if ($pdb) { Copy-Item $pdb.FullName (Join-Path $out "2ship.pdb") -Force }
-
-          Write-Host "Core DLL source: $($dll.FullName)"
-          Write-Host "Core LIB source: $($lib.FullName)"
-          Get-ChildItem $out | Format-Table Name, Length
+          Write-Host "CMake placed the core exactly where the UWP project expects it:"
+          Get-Item $dll, $lib | Format-Table FullName, Length
+          if (Test-Path $pdb) { Get-Item $pdb | Format-Table FullName, Length }
 
           $uwpDeps = Join-Path $env:GITHUB_WORKSPACE "build_vanilla\_deps\uwplibs-src\x64"
           if (-not (Test-Path $uwpDeps)) {
