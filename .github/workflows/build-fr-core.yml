@@ -135,9 +135,97 @@ jobs:
             "Baseline: 0e1966ffbdc5baafb3689894d73f5c469bdd0a62"
             "Package version: 0.1.0.1"
             "Target: Xbox / UWP x64"
-            "Build package is unsigned at this validation stage."
+            "Build package is staged unsigned, then signed by CI with the included development certificate."
             "Runtime ROM remains NTSC-U. No ROM is included."
           ) | Set-Content -Encoding UTF8 (Join-Path $stage "BUILD_INFO.txt")
+
+          Get-ChildItem $stage | Format-Table Name, Length
+
+      - name: Sign Xbox sideload packages
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:GITHUB_WORKSPACE "fr-uwp-artifact"
+          $publisher = "CN=odolwa"
+
+          $cert = New-SelfSignedCertificate `
+            -Type Custom `
+            -Subject $publisher `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -HashAlgorithm SHA256 `
+            -KeyUsage DigitalSignature `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}") `
+            -FriendlyName "2Ship FR Xbox Dev Signing" `
+            -NotAfter (Get-Date).AddYears(2)
+
+          if (-not $cert) {
+            throw "Failed to create the Xbox sideload signing certificate."
+          }
+
+          $cerPath = Join-Path $stage "2ship-fr-dev-cert.cer"
+          Export-Certificate -Cert $cert -FilePath $cerPath -Force | Out-Null
+          Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\CurrentUser\TrustedPeople" | Out-Null
+
+          $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+          if (-not $signtool) {
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -File |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $signtool -or -not (Test-Path $signtool)) {
+            throw "signtool.exe was not found."
+          }
+
+          $appPackages = Get-ChildItem $stage -File |
+            Where-Object {
+              $_.Name -like "2ship2harkinian_*" -and
+              $_.Extension -in @(".msix", ".msixbundle", ".appx", ".appxbundle")
+            }
+
+          if (-not $appPackages) {
+            throw "No 2Ship MSIX/AppX package was found in the staging directory."
+          }
+
+          foreach ($package in $appPackages) {
+            Write-Host "Signing $($package.Name)"
+            & $signtool sign /fd SHA256 /sha1 $cert.Thumbprint /s My $package.FullName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Signing failed for $($package.Name)."
+            }
+
+            & $signtool verify /pa /v $package.FullName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Signature verification failed for $($package.Name)."
+            }
+          }
+
+          @(
+            "2Ship2Harkinian FR - Xbox Dev Mode installation"
+            ""
+            "Package: 2ship2harkinian_0.1.0.1_x64.msixbundle"
+            "Certificate: 2ship-fr-dev-cert.cer"
+            "Dependency if requested: Microsoft.VCLibs.x64.14.00.appx"
+            ""
+            "1. Keep the existing D:\2ship / E:\2ship user data, ROM, O2R, mods and saves untouched."
+            "2. Open Xbox Device Portal in Dev Mode and go to the app deployment page."
+            "3. Select the x64 MSIX bundle as the application package."
+            "4. Select 2ship-fr-dev-cert.cer as the signing certificate."
+            "5. Add Microsoft.VCLibs.x64.14.00.appx only if the portal requests the VC runtime dependency."
+            "6. Do not use the ARM, ARM64 or x86 VCLibs packages for this Xbox x64 build."
+            "7. If version 0.1.0.0 is already installed, try 0.1.0.1 as an update first."
+            "8. If Device Portal refuses the update, do NOT uninstall the old package yet; preserve the exact error for diagnosis."
+            ""
+            "Signing publisher: $publisher"
+            "Certificate thumbprint: $($cert.Thumbprint)"
+            "Runtime ROM remains NTSC-U. No ROM is included."
+          ) | Set-Content -Encoding UTF8 (Join-Path $stage "INSTALL_XBOX.txt")
+
+          Add-Content -Encoding UTF8 (Join-Path $stage "BUILD_INFO.txt") @(
+            "Signing publisher: $publisher"
+            "Signing certificate thumbprint: $($cert.Thumbprint)"
+            "Signing certificate file: 2ship-fr-dev-cert.cer"
+          )
 
           Get-ChildItem $stage | Format-Table Name, Length
 
