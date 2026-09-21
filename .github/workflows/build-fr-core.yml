@@ -1,4 +1,4 @@
-name: build-fr-xbox-core
+name: build-fr-xbox-uwp
 
 on:
   push:
@@ -7,55 +7,140 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-fr-core:
+  build-fr-uwp:
     runs-on: windows-latest
+    timeout-minutes: 120
+
     steps:
       - name: Checkout exact FR branch
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
+          fetch-depth: 0
 
-      - name: Install Ninja
-        run: |
-          choco install ninja -y
-          Remove-Item -Path "C:\ProgramData\Chocolatey\bin\ccache.exe" -Force -ErrorAction SilentlyContinue
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
-      - name: Configure MSVC
+      - name: Configure MSVC x64
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-      - name: Configure FR core
+      - name: Configure UWP-compatible core
+        shell: pwsh
         env:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg
         run: |
-          cmake -S . -B build-windows -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_BUILD_TYPE:STRING=Release
+          cmake -S . -B build_vanilla -G "Visual Studio 17 2022" -T v143 -A x64 -DCMAKE_BUILD_TYPE:STRING=Release
 
-      - name: Build FR 2ship.dll only
-        run: |
-          cmake --build build-windows --config Release --parallel 10 --target 2ship
-
-      - name: Stage FR core
+      - name: Generate 2ship.o2r
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path fr-core | Out-Null
-          $dll = Get-ChildItem -Path build-windows -Recurse -Filter 2ship.dll | Select-Object -First 1
-          $lib = Get-ChildItem -Path build-windows -Recurse -Filter 2ship.lib | Select-Object -First 1
-          $pdb = Get-ChildItem -Path build-windows -Recurse -Filter 2ship.pdb | Select-Object -First 1
-          if (-not $dll) { throw "2ship.dll introuvable apres compilation." }
-          Copy-Item $dll.FullName fr-core\2ship.dll
-          if ($lib) { Copy-Item $lib.FullName fr-core\2ship.lib }
-          if ($pdb) { Copy-Item $pdb.FullName fr-core\2ship.pdb }
+          cmake --build build_vanilla --config Release --target Generate2ShipOtr --parallel 8
+          if (-not (Test-Path "2ship.o2r")) {
+            throw "2ship.o2r was not generated at repository root."
+          }
+          Get-Item "2ship.o2r" | Format-List FullName, Length
+
+      - name: Build French 2ship core
+        shell: pwsh
+        run: |
+          cmake --build build_vanilla --config Release --target 2ship --parallel 8
+
+      - name: Stage core for UWP project
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE "x64\Release"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          $dll = Get-ChildItem -Path build_vanilla -Recurse -File -Filter 2ship.dll |
+            Where-Object { $_.FullName -notmatch '\\_deps\\' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          $lib = Get-ChildItem -Path build_vanilla -Recurse -File -Filter 2ship.lib |
+            Where-Object { $_.FullName -notmatch '\\_deps\\' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          $pdb = Get-ChildItem -Path build_vanilla -Recurse -File -Filter 2ship.pdb |
+            Where-Object { $_.FullName -notmatch '\\_deps\\' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $dll) { throw "2ship.dll not found after successful CMake build." }
+          if (-not $lib) { throw "2ship.lib not found after successful CMake build." }
+
+          Copy-Item $dll.FullName (Join-Path $out "2ship.dll") -Force
+          Copy-Item $lib.FullName (Join-Path $out "2ship.lib") -Force
+          if ($pdb) { Copy-Item $pdb.FullName (Join-Path $out "2ship.pdb") -Force }
+
+          Write-Host "Core DLL source: $($dll.FullName)"
+          Write-Host "Core LIB source: $($lib.FullName)"
+          Get-ChildItem $out | Format-Table Name, Length
+
+          $uwpDeps = Join-Path $env:GITHUB_WORKSPACE "build_vanilla\_deps\uwplibs-src\x64"
+          if (-not (Test-Path $uwpDeps)) {
+            throw "UWP dependency tree was not generated: $uwpDeps"
+          }
+          Write-Host "UWP dependency tree: $uwpDeps"
+
+      - name: Prepare UWP project for CI packaging
+        shell: pwsh
+        run: |
+          $project = "vs2022-uwp\uwp\uwp.vcxproj"
+          $xml = Get-Content $project -Raw
+          $xml = $xml -replace '<AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>', '<AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>'
+          $xml = $xml -replace '(?m)^\s*<PackageCertificateKeyFile>.*?</PackageCertificateKeyFile>\s*$', ''
+          $xml = $xml -replace '(?m)^\s*<Content Include="(?:recomp|uwp)_TemporaryKey\.pfx" />\s*$', ''
+          Set-Content -Path $project -Value $xml -Encoding UTF8
+
+      - name: Build x64 UWP package
+        shell: pwsh
+        run: |
+          $project = Join-Path $env:GITHUB_WORKSPACE "vs2022-uwp\uwp\uwp.vcxproj"
+          $solutionDir = (Join-Path $env:GITHUB_WORKSPACE "vs2022-uwp") + "\"
+
+          msbuild $project /m /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:SolutionDir="$solutionDir" /p:GenerateAppxPackageOnBuild=true /p:AppxBundle=Always /p:AppxBundlePlatforms=x64 /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false
+
+      - name: Stage UWP build artifact
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:GITHUB_WORKSPACE "fr-uwp-artifact"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+          $packages = Get-ChildItem -Path "vs2022-uwp" -Recurse -File |
+            Where-Object { $_.Extension -in @(".msixbundle", ".appxbundle", ".msix", ".appx") }
+
+          if (-not $packages) {
+            Write-Host "No packaged UWP file was found. Candidate output files:"
+            Get-ChildItem -Path "vs2022-uwp" -Recurse -File |
+              Where-Object { $_.FullName -match "\\(x64|AppPackages|Release)\\" } |
+              Select-Object -First 200 FullName, Length
+            throw "The UWP project compiled but did not produce an AppX/MSIX package."
+          }
+
+          foreach ($package in $packages) {
+            Copy-Item $package.FullName (Join-Path $stage $package.Name) -Force
+          }
+
+          Copy-Item "x64\Release\2ship.dll" (Join-Path $stage "2ship.dll") -Force
+          Copy-Item "x64\Release\2ship.lib" (Join-Path $stage "2ship.lib") -Force
+          Copy-Item "2ship.o2r" (Join-Path $stage "2ship.o2r") -Force
+
           @(
             "Branch: ${{ github.ref_name }}"
             "Commit: ${{ github.sha }}"
-            "Baseline source: 0e1966ffbdc5baafb3689894d73f5c469bdd0a62"
-            "Purpose: French in-game runtime strings for Xbox/UWP"
-            "No ROM included"
-          ) | Set-Content -Encoding UTF8 fr-core\BUILD_INFO.txt
-          Get-ChildItem fr-core
+            "Baseline: 0e1966ffbdc5baafb3689894d73f5c469bdd0a62"
+            "Package version: 0.1.0.1"
+            "Target: Xbox / UWP x64"
+            "Build package is unsigned at this validation stage."
+            "Runtime ROM remains NTSC-U. No ROM is included."
+          ) | Set-Content -Encoding UTF8 (Join-Path $stage "BUILD_INFO.txt")
 
-      - name: Upload FR Xbox core
+          Get-ChildItem $stage | Format-Table Name, Length
+
+      - name: Upload French Xbox UWP build
         uses: actions/upload-artifact@v4
         with:
-          name: 2ship-fr-xbox-core
-          path: fr-core
+          name: 2ship-fr-xbox-uwp-0.1.0.1
+          path: fr-uwp-artifact
           retention-days: 7
