@@ -133,7 +133,7 @@ jobs:
             "Branch: ${{ github.ref_name }}"
             "Commit: ${{ github.sha }}"
             "Baseline: 0e1966ffbdc5baafb3689894d73f5c469bdd0a62"
-            "Package version: 0.1.0.1"
+            "Package version: 0.1.0.2"
             "Target: Xbox / UWP x64"
             "Build package is staged unsigned, then signed by CI with the included development certificate."
             "Runtime ROM remains NTSC-U. No ROM is included."
@@ -145,7 +145,7 @@ jobs:
         shell: pwsh
         run: |
           $stage = Join-Path $env:GITHUB_WORKSPACE "fr-uwp-artifact"
-          $publisher = "CN=odolwa"
+          $publisher = "CN=SternXD"
 
           $cert = New-SelfSignedCertificate `
             -Type Custom `
@@ -208,7 +208,7 @@ jobs:
           @(
             "2Ship2Harkinian FR - Xbox Dev Mode installation"
             ""
-            "Package: 2ship2harkinian_0.1.0.1_x64.msixbundle"
+            "Package: 2ship2harkinian_0.1.0.2_x64.msixbundle"
             "Certificate: 2ship-fr-dev-cert.cer"
             "Dependency if requested: Microsoft.VCLibs.x64.14.00.appx"
             ""
@@ -218,7 +218,7 @@ jobs:
             "4. Select 2ship-fr-dev-cert.cer as the signing certificate."
             "5. Add Microsoft.VCLibs.x64.14.00.appx only if the portal requests the VC runtime dependency."
             "6. Do not use the ARM, ARM64 or x86 VCLibs packages for this Xbox x64 build."
-            "7. If version 0.1.0.0 is already installed, try 0.1.0.1 as an update first."
+            "7. If version 0.1.0.0 is already installed, try 0.1.0.2 as an update first."
             "8. If Device Portal refuses the update, do NOT uninstall the old package yet; preserve the exact error for diagnosis."
             ""
             "Signing publisher: $publisher"
@@ -237,6 +237,6 @@ jobs:
       - name: Upload French Xbox UWP build
         uses: actions/upload-artifact@v4
         with:
-          name: 2ship-fr-xbox-uwp-0.1.0.1
+          name: 2ship-fr-xbox-uwp-0.1.0.2
           path: fr-uwp-artifact
           retention-days: 7
