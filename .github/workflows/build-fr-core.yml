@@ -33,6 +33,17 @@ jobs:
         run: |
           cmake -S . -B build_vanilla -G "Visual Studio 17 2022" -T v143 -A x64 -DCMAKE_BUILD_TYPE:STRING=Release
 
+      - name: Apply UWP ZAPD patch before compiling ZAPD
+        shell: pwsh
+        run: |
+          cmake --build build_vanilla --config Release --target ApplyUwpPatches
+          $zapdMain = "ZAPDTR\ZAPD\Main.cpp"
+          $patched = Select-String -Path $zapdMain -Pattern "SetZapdProgressCallback" -SimpleMatch
+          if (-not $patched) {
+            throw "The UWP ZAPD progress-callback patch was not applied before ZAPD compilation."
+          }
+          Write-Host "UWP ZAPD patch confirmed."
+
       - name: Generate 2ship.o2r
         shell: pwsh
         run: |
@@ -61,6 +72,13 @@ jobs:
           Write-Host "CMake placed the core exactly where the UWP project expects it:"
           Get-Item $dll, $lib | Format-Table FullName, Length
           if (Test-Path $pdb) { Get-Item $pdb | Format-Table FullName, Length }
+
+          $exports = & dumpbin /exports $dll
+          $exports | Select-String "SetZapdProgressCallback"
+          if (-not ($exports -match "SetZapdProgressCallback")) {
+            throw "2ship.dll does not export SetZapdProgressCallback; ZAPD patch/linking failed."
+          }
+          Write-Host "SetZapdProgressCallback export confirmed."
 
           $uwpDeps = Join-Path $env:GITHUB_WORKSPACE "build_vanilla\_deps\uwplibs-src\x64"
           if (-not (Test-Path $uwpDeps)) {
