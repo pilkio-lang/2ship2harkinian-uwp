@@ -166,6 +166,7 @@ jobs:
           $cerPath = Join-Path $stage "2ship-fr-dev-cert.cer"
           Export-Certificate -Cert $cert -FilePath $cerPath -Force | Out-Null
           Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\CurrentUser\TrustedPeople" | Out-Null
+          Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
 
           $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
           if (-not $signtool) {
