@@ -203,9 +203,10 @@ OTRGlobals::OTRGlobals() {
 #else
     int defaultLogLevel = 2;
 #endif
-    Ship::Context::GetInstance()->GetLogger()->set_level(
-        (spdlog::level::level_enum)CVarGetInteger("gDeveloperTools.LogLevel", defaultLogLevel));
-    Ship::Context::GetInstance()->GetLogger()->set_pattern("[%H:%M:%S.%e] [%s:%#] [%l] %v");
+    if (auto logger = Ship::Context::GetInstance()->GetLogger(); logger != nullptr) {
+        logger->set_level((spdlog::level::level_enum)CVarGetInteger("gDeveloperTools.LogLevel", defaultLogLevel));
+        logger->set_pattern("[%H:%M:%S.%e] [%s:%#] [%l] %v");
+    }
 
     auto overlay = context->GetInstance()->GetWindow()->GetGui()->GetGameOverlay();
     overlay->LoadFont("Press Start 2P", 12.0f, "fonts/PressStart2P-Regular.ttf");

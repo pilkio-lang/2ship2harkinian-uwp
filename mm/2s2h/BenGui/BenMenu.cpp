@@ -1704,8 +1704,9 @@ void BenMenu::AddDevTools() {
                               "console. This does not affect the log file output.")
                      .ComboVec(&logLevels))
         .Callback([](WidgetInfo& info) {
-            Ship::Context::GetInstance()->GetLogger()->set_level(
-                (spdlog::level::level_enum)CVarGetInteger("gDeveloperTools.LogLevel", 1));
+            if (auto logger = Ship::Context::GetInstance()->GetLogger(); logger != nullptr) {
+                logger->set_level((spdlog::level::level_enum)CVarGetInteger("gDeveloperTools.LogLevel", 1));
+            }
         })
         .PreFunc([](WidgetInfo& info) { info.isHidden = mBenMenu->disabledMap.at(DISABLE_FOR_DEBUG_MODE_OFF).active; });
     AddWidget(path, "Frame Advance", WIDGET_CHECKBOX)

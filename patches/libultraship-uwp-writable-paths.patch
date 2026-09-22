@@ -1,0 +1,58 @@
+diff --git a/src/ship/Context.cpp b/src/ship/Context.cpp
+--- a/src/ship/Context.cpp
++++ b/src/ship/Context.cpp
+@@ -153,7 +153,10 @@ bool Context::InitLogging() {
+ #endif
+ 
+         // UWP TODO: Issue with folder creation in local state, would be nice to get outside app folder for logs
+         auto logPath = GetPathRelativeToAppDirectory(("logs/" + GetName() + ".log"));
++#ifdef _UWP
++        std::filesystem::create_directories(std::filesystem::path(logPath).parent_path());
++#endif
+ 
+         auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logPath, 1024 * 1024 * 10, 10);
+         sinks.push_back(fileSink);
+@@ -175,4 +178,7 @@ bool Context::InitLogging() {
+         std::cout << "Log initialization failed: " << ex.what() << std::endl;
+         return false;
++    } catch (const std::exception& ex) {
++        std::cout << "Log path initialization failed: " << ex.what() << std::endl;
++        return false;
+     }
+ }
+@@ -506,6 +512,10 @@ std::string Context::GetAppDirectoryPath(std::string appName) {
+     }
+ #endif
+ 
++#ifdef _UWP
++    return GetPathRelativeToAuxiliary("");
++#endif
++
+ #ifdef NON_PORTABLE
+     if (appName.empty()) {
+         appName = GetInstance()->mShortName;
+diff --git a/src/ship/debug/CrashHandler.cpp b/src/ship/debug/CrashHandler.cpp
+--- a/src/ship/debug/CrashHandler.cpp
++++ b/src/ship/debug/CrashHandler.cpp
+@@ -197,7 +197,9 @@ static void ErrorHandler(int sig, siginfo_t* sigInfo, void* data) {
+     free(symbols);
+     crashHandler->PrintCommon();
+ 
+-    Context::GetInstance()->GetLogger()->flush();
++    if (auto logger = Context::GetInstance()->GetLogger(); logger != nullptr) {
++        logger->flush();
++    }
+     spdlog::shutdown();
+     exit(1);
+ }
+@@ -390,7 +392,9 @@ void CrashHandler::PrintStack(CONTEXT* ctx) {
+         }
+     }
+     PrintCommon();
+-    Context::GetInstance()->GetLogger()->flush();
++    if (auto logger = Context::GetInstance()->GetLogger(); logger != nullptr) {
++        logger->flush();
++    }
+     spdlog::shutdown();
+ #endif
+ }
