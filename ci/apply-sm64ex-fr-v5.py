@@ -119,35 +119,9 @@ p.write_text(s, encoding="utf-8")
 p = root / "bin" / "segment2.c"
 s = p.read_text(encoding="utf-8")
 
-def ia4_texture(points):
-    pix = [[0 for _ in range(8)] for _ in range(16)]
-    for x, y in points:
-        if 0 <= x < 8 and 0 <= y < 16:
-            pix[y][x] = 0xF
-    out = []
-    for y in range(16):
-        for x in range(0, 8, 2):
-            out.append((pix[y][x] << 4) | pix[y][x + 1])
-    return out
-
-patterns = {
-    "grave": [(2,2),(2,3),(3,3),(3,4)],
-    "acute": [(5,2),(5,3),(4,3),(4,4)],
-    "circumflex": [(2,4),(3,3),(4,2),(5,3),(6,4)],
-    "umlaut": [(2,3),(3,3),(5,3),(6,3)],
-    "cedilla": [(3,11),(4,12),(3,13),(2,13)],
-}
-defs = []
-for name, pts in patterns.items():
-    vals = ia4_texture(pts)
-    rows = []
-    for i in range(0, len(vals), 8):
-        rows.append("    " + ", ".join(f"0x{v:02X}" for v in vals[i:i+8]) + ",")
-    defs.append(f"ALIGNED8 static const u8 texture_font_char_fr_{name}[] = {{\n" + "\n".join(rows) + "\n};\n")
-accent_defs = "\n".join(defs) + "\n"
-
-font_marker = "const u8 *const main_font_lut[] = {"
-s = replace_once(s, font_marker, accent_defs + font_marker, "accent texture insertion")
+# EXTERNAL_DATA stores texture arrays as asset-path strings. Reuse existing
+# US punctuation glyphs as compact diacritic marks so the native EU renderer
+# positions them correctly without requiring PAL assets or raw embedded bytes.
 
 # Patch US main_font_lut slots 0xE3..0xEB.
 start = s.index("#elif defined(VERSION_US) // US Font Table")
@@ -160,15 +134,15 @@ tokens = [t.strip() for t in body.replace("\n", " ").split(",") if t.strip()]
 if len(tokens) != 256:
     raise SystemExit(f"US main_font_lut expected 256 entries, got {len(tokens)}")
 for idx, name in {
-    0xE3:"texture_font_char_fr_grave",
-    0xE4:"texture_font_char_fr_circumflex",
-    0xE5:"texture_font_char_fr_umlaut",
-    0xE6:"texture_font_char_fr_acute",
-    0xE7:"texture_font_char_fr_grave",
-    0xE8:"texture_font_char_fr_circumflex",
-    0xE9:"texture_font_char_fr_umlaut",
-    0xEA:"texture_font_char_fr_acute",
-    0xEB:"texture_font_char_fr_cedilla",
+    0xE3:"texture_font_char_us_apostrophe",
+    0xE4:"texture_font_char_us_tilde",
+    0xE5:"texture_font_char_us_double_quote_open",
+    0xE6:"texture_font_char_us_apostrophe",
+    0xE7:"texture_font_char_us_apostrophe",
+    0xE8:"texture_font_char_us_tilde",
+    0xE9:"texture_font_char_us_double_quote_open",
+    0xEA:"texture_font_char_us_apostrophe",
+    0xEB:"texture_font_char_us_comma",
 }.items():
     tokens[idx] = name
 lines = []
@@ -176,83 +150,38 @@ for i in range(0, 256, 4):
     lines.append("    " + ", ".join(f"{t:>38}" for t in tokens[i:i+4]) + ",")
 s = prefix + directive + "\n" + "\n".join(lines) + "\n" + suffix
 
-# Restore letters omitted from the US HUD LUT. The US ROM does not ship
-# RGBA16 HUD glyphs for J/Q/V/X/Z, so embed tiny 16x16 replacements rather
-# than pointing the LUT at identifiers which only exist in VERSION_EU.
-def rgba16_hud_texture(rows):
-    # 5x7 bitmap scaled 2x and centered in a 16x16 RGBA5551 texture.
-    pix = [[False for _ in range(16)] for _ in range(16)]
-    scale = 2
-    ox = 3
-    oy = 1
-    for yy, row in enumerate(rows):
-        for xx, bit in enumerate(row):
-            if bit == "1":
-                for dy in range(scale):
-                    for dx in range(scale):
-                        px = ox + xx * scale + dx
-                        py = oy + yy * scale + dy
-                        if 0 <= px < 16 and 0 <= py < 16:
-                            pix[py][px] = True
-    out = []
-    for y in range(16):
-        for x in range(16):
-            value = 0xFFFF if pix[y][x] else 0x0000
-            out.extend([(value >> 8) & 0xFF, value & 0xFF])
-    return out
-
-hud_patterns = {
-    "J": ["00111","00010","00010","00010","00010","10010","01100"],
-    "Q": ["01110","10001","10001","10001","10101","10010","01101"],
-    "V": ["10001","10001","10001","10001","10001","01010","00100"],
-    "X": ["10001","10001","01010","00100","01010","10001","10001"],
-    "Z": ["11111","00001","00010","00100","01000","10000","11111"],
-}
-hud_defs = []
-for letter, rows in hud_patterns.items():
-    vals = rgba16_hud_texture(rows)
-    body_rows = []
-    for i in range(0, len(vals), 16):
-        body_rows.append("    " + ", ".join(f"0x{v:02X}" for v in vals[i:i+16]) + ",")
-    hud_defs.append(
-        f"ALIGNED8 static const u8 texture_hud_char_fr_{letter}[] = {{\n"
-        + "\n".join(body_rows) + "\n};\n"
-    )
-
-hud_marker = "const u8 *const main_hud_lut[] = {"
-s = replace_once(s, hud_marker, "\n".join(hud_defs) + "\n" + hud_marker, "French HUD glyph insertion")
-
-hud_start = s.index("const u8 *const main_hud_lut[] = {")
-hud_end = s.index("};", hud_start)
-hud_block = s[hud_start:hud_end]
-u0 = hud_block.index("#elif defined(VERSION_US)")
-u1 = hud_block.index("#else", u0)
-pre = hud_block[:u0]
-us_section = hud_block[u0:u1]
-post = hud_block[u1:]
-udirective, ubody = us_section.split("\n", 1)
-utokens = [t.strip() for t in ubody.replace("\n", " ").split(",") if t.strip()]
-for idx, name in {
-    19:"texture_hud_char_fr_J",
-    26:"texture_hud_char_fr_Q",
-    31:"texture_hud_char_fr_V",
-    33:"texture_hud_char_fr_X",
-    35:"texture_hud_char_fr_Z",
-}.items():
-    if idx >= len(utokens):
-        raise SystemExit("US HUD LUT index out of range")
-    utokens[idx] = name
-ulines = []
-for i in range(0, len(utokens), 4):
-    ulines.append("    " + ", ".join(f"{t:>35}" for t in utokens[i:i+4]) + ",")
-new_hud_block = pre + udirective + "\n" + "\n".join(ulines) + "\n" + post
-s = s[:hud_start] + new_hud_block + s[hud_end:]
+# The US HUD LUT omits J/Q/V/X/Z. Keep that LUT untouched; the EU
+# renderer below falls back to the complete small-font LUT for those letters.
 p.write_text(s, encoding="utf-8")
 
 # 4) Force the EU renderer language to French and support cedilla as base+mark.
 p = root / "src" / "game" / "ingame_menu.c"
 s = p.read_text(encoding="utf-8")
 s = s.replace("eu_get_language()", "LANGUAGE_FRENCH")
+
+hud_switch_old = '''            case HUD_CHAR_U_UMLAUT:
+                print_hud_char_umlaut(curX, curY, ASCII_TO_DIALOG('U'));
+                curX += xStride;
+                break;
+            default:
+'''
+hud_switch_new = '''            case HUD_CHAR_U_UMLAUT:
+                print_hud_char_umlaut(curX, curY, ASCII_TO_DIALOG('U'));
+                curX += xStride;
+                break;
+#ifdef SM64EX_FRENCH_TEXT
+            case 19: // J is absent from the US HUD LUT
+            case 26: // Q
+            case 31: // V
+            case 33: // X
+            case 35: // Z
+                render_generic_char_at_pos(curX + 2, curY + 16, str[strPos]);
+                curX += xStride;
+                break;
+#endif
+            default:
+'''
+s = replace_once(s, hud_switch_old, hud_switch_new, "French HUD fallback")
 
 generic_anchor = '''            case DIALOG_CHAR_LOWER_I_CIRCUMFLEX:
             case DIALOG_CHAR_LOWER_I_UMLAUT:
