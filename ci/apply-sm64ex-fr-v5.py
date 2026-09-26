@@ -346,4 +346,16 @@ menu_names_new = '''   // Print menu names
 s = replace_once(s, menu_names, menu_names_new, "file-select labels")
 p.write_text(s, encoding="utf-8")
 
+# 6) Expose the EU centering helper to US file_select when French text is enabled.
+p = root / "src" / "game" / "ingame_menu.h"
+s = p.read_text(encoding="utf-8")
+old_decl = """#if defined(VERSION_JP) || defined(VERSION_EU)
+s16 get_str_x_pos_from_center_scale(s16 centerPos, u8 *str, f32 scale);
+#endif"""
+new_decl = """#if defined(VERSION_JP) || defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+s16 get_str_x_pos_from_center_scale(s16 centerPos, u8 *str, f32 scale);
+#endif"""
+s = replace_once(s, old_decl, new_decl, "scaled-centering declaration")
+p.write_text(s, encoding="utf-8")
+
 print("Applied FR v5: native EU text renderer + PAL layout on NTSC runtime.")
