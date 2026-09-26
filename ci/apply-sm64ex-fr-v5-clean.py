@@ -182,6 +182,13 @@ s = once(s,
 #if defined(VERSION_EU) || defined(SM64EX_FRENCH_RENDERER)
 ''',
 "accent char enum")
+# The scaled centering helper is used by the French file-select title.
+s = once(s,
+'''#if defined(VERSION_JP) || defined(VERSION_EU)
+s16 get_str_x_pos_from_center_scale''',
+'''#if defined(VERSION_JP) || defined(VERSION_EU) || defined(SM64EX_FRENCH_RENDERER)
+s16 get_str_x_pos_from_center_scale''',
+"scaled centering declaration")
 write(p, s)
 
 # ----------------------------------------------------------------------
