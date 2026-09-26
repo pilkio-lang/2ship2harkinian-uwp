@@ -72,18 +72,53 @@ jobs:
           cmake --preset uwp-package-release
           cmake --build --preset uwp-package-release
 
-      - name: Sign package as CN=Caorthann
+      - name: Repack as 1.0.0.1 and sign as CN=Caorthann
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $out = Join-Path $env:GITHUB_WORKSPACE "deliverable"
           New-Item -ItemType Directory -Force $out | Out-Null
 
-          $msix = Get-ChildItem "$env:GITHUB_WORKSPACE\sm64ex-src\ports\uwp\build-package" -Recurse -File |
+          $built = Get-ChildItem "$env:GITHUB_WORKSPACE\sm64ex-src\ports\uwp\build-package" -Recurse -File |
             Where-Object { $_.Extension -in ".msix", ".appx" } |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
-          if (-not $msix) { throw "No MSIX/AppX package was produced." }
+          if (-not $built) { throw "No MSIX/AppX package was produced." }
+
+          $sdkBin = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          $makeappx = Join-Path $sdkBin.FullName "x64\makeappx.exe"
+          $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
+          if (!(Test-Path $makeappx)) { throw "makeappx.exe not found." }
+          if (!(Test-Path $signtool)) { throw "signtool.exe not found." }
+
+          $unpack = Join-Path $env:GITHUB_WORKSPACE "repack"
+          if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
+          New-Item -ItemType Directory -Force $unpack | Out-Null
+
+          & $makeappx unpack /p $built.FullName /d $unpack /o
+          if ($LASTEXITCODE -ne 0) { throw "MSIX unpack failed." }
+
+          [xml]$manifest = Get-Content (Join-Path $unpack "AppxManifest.xml")
+          $ns = New-Object System.Xml.XmlNamespaceManager($manifest.NameTable)
+          $ns.AddNamespace("f", "http://schemas.microsoft.com/appx/manifest/foundation/windows10")
+          $identity = $manifest.SelectSingleNode("/f:Package/f:Identity", $ns)
+          if (-not $identity) { throw "Package Identity node not found." }
+          $identity.Version = "1.0.0.1"
+          $settings = New-Object System.Xml.XmlWriterSettings
+          $settings.Encoding = New-Object System.Text.UTF8Encoding($false)
+          $settings.Indent = $true
+          $writer = [System.Xml.XmlWriter]::Create((Join-Path $unpack "AppxManifest.xml"), $settings)
+          $manifest.Save($writer)
+          $writer.Close()
+
+          Remove-Item (Join-Path $unpack "AppxSignature.p7x") -Force -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $unpack "AppxBlockMap.xml") -Force -ErrorAction SilentlyContinue
+
+          $dest = Join-Path $out "sm64ex-uwp-NTSC-FR_1.0.0.1_x64.msix"
+          & $makeappx pack /d $unpack /p $dest /o
+          if ($LASTEXITCODE -ne 0) { throw "MSIX repack failed." }
 
           $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=Caorthann" -KeyUsage DigitalSignature -FriendlyName "sm64ex NTSC-FR UWP" -CertStoreLocation "Cert:\CurrentUser\My" -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3","2.5.29.19={text}")
           $pwdText = "sm64ex-fr-build"
@@ -93,24 +128,16 @@ jobs:
           Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $pwd | Out-Null
           Export-Certificate -Cert $cert -FilePath $cer | Out-Null
 
-          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
-            Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } |
-            Sort-Object FullName -Descending |
-            Select-Object -First 1
-          if (-not $signtool) { throw "signtool.exe not found." }
-
-          & $signtool.FullName remove /s $msix.FullName 2>$null
-          & $signtool.FullName sign /fd SHA256 /f $pfx /p $pwdText $msix.FullName
+          & $signtool sign /fd SHA256 /f $pfx /p $pwdText $dest
           if ($LASTEXITCODE -ne 0) { throw "Signing failed." }
-          & $signtool.FullName verify /pa /v $msix.FullName
+
+          Import-Certificate -FilePath $cer -CertStoreLocation "Cert:\CurrentUser\TrustedPeople" | Out-Null
+          & $signtool verify /pa /v $dest
           if ($LASTEXITCODE -ne 0) { throw "Signature verification failed." }
 
-          $dest = Join-Path $out "sm64ex-uwp-NTSC-FR_1.0.0.1_x64.msix"
-          Copy-Item $msix.FullName $dest -Force
           Remove-Item $pfx -Force
-
           Get-FileHash $dest -Algorithm SHA256 | Format-List | Out-File (Join-Path $out "SHA256.txt")
-          Get-Content "$env:GITHUB_WORKSPACE\sm64ex-src\ports\uwp\Package.appxmanifest" | Out-File (Join-Path $out "Package.appxmanifest.txt")
+          Get-Content (Join-Path $unpack "AppxManifest.xml") | Out-File (Join-Path $out "Package.appxmanifest.txt")
 
       - name: Upload installable package
         uses: actions/upload-artifact@v4
