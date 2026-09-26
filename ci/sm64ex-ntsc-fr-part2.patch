@@ -1,0 +1,205 @@
+diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/ports/uwp/tools/generate_build_stubs.py b/ports/uwp/tools/generate_build_stubs.py
+--- a/ports/uwp/tools/generate_build_stubs.py	2026-06-02 17:03:24.000000000 +0000
++++ b/ports/uwp/tools/generate_build_stubs.py	2026-09-26 14:37:09.442019951 +0000
+@@ -49,40 +49,43 @@
+     if not clang:
+         raise RuntimeError("clang was not found on PATH")
+ 
+-    for source_name in ("define_courses.inc.c", "define_text.inc.c"):
+-        preprocessed = output_root / "text" / "us" / f"{source_name}.preprocessed"
+-        preprocessed.parent.mkdir(parents=True, exist_ok=True)
+-        subprocess.run(
+-            [
+-                clang,
+-                "-E",
+-                "-P",
+-                "-x",
+-                "c",
+-                "-DVERSION_US",
+-                "-I",
+-                "text/us",
+-                "-I",
+-                "text",
+-                str(repo_root / "text" / source_name),
+-                "-o",
+-                str(preprocessed),
+-            ],
+-            cwd=str(repo_root),
+-            check=True,
+-        )
+-        subprocess.run(
+-            [
+-                str(repo_root / "tools" / "textconv.exe"),
+-                "charmap.txt",
+-                str(preprocessed),
+-                str(output_root / "text" / "us" / source_name),
+-            ],
+-            cwd=str(repo_root),
+-            env=env,
+-            check=True,
+-        )
+-        preprocessed.unlink()
++    # Generate the normal US tables plus a French table for the Xbox NTSC-FR build.
++    # The game remains VERSION_US; only text data is switched to French.
++    for language in ("us", "fr"):
++        for source_name in ("define_courses.inc.c", "define_text.inc.c"):
++            preprocessed = output_root / "text" / language / f"{source_name}.preprocessed"
++            preprocessed.parent.mkdir(parents=True, exist_ok=True)
++            subprocess.run(
++                [
++                    clang,
++                    "-E",
++                    "-P",
++                    "-x",
++                    "c",
++                    "-DVERSION_US",
++                    "-I",
++                    f"text/{language}",
++                    "-I",
++                    "text",
++                    str(repo_root / "text" / source_name),
++                    "-o",
++                    str(preprocessed),
++                ],
++                cwd=str(repo_root),
++                check=True,
++            )
++            subprocess.run(
++                [
++                    str(repo_root / "tools" / "textconv.exe"),
++                    "charmap.txt",
++                    str(preprocessed),
++                    str(output_root / "text" / language / source_name),
++                ],
++                cwd=str(repo_root),
++                env=env,
++                check=True,
++            )
++            preprocessed.unlink()
+ 
+ 
+ def generate_level_headers(repo_root, output_root):
+diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/src/game/ingame_menu.c b/src/game/ingame_menu.c
+--- a/src/game/ingame_menu.c	2026-06-02 17:03:24.000000000 +0000
++++ b/src/game/ingame_menu.c	2026-09-26 14:37:09.444269067 +0000
+@@ -77,7 +77,7 @@
+     7,  5,  5,  5,  6,  5,  5,  5,  5,  5,  7,  7,  5,  5,  4,  4,
+     8,  6,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     8,  8,  8,  8,  7,  7,  6,  7,  7,  0,  0,  0,  0,  0,  0,  0,
+-#ifdef VERSION_EU
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+     6,  6,  6,  0,  6,  6,  6,  0,  0,  0,  0,  0,  0,  0,  0,  4,
+     5,  5,  5,  5,  6,  6,  6,  6,  0,  0,  0,  0,  0,  0,  0,  0,
+     5,  5,  5,  0,  6,  6,  6,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+@@ -93,7 +93,7 @@
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+-#ifdef VERSION_EU
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+     7,  5, 10,  5,  9,  8,  4,  0,  0,  0,  0,  5,  5,  6,  5,  0,
+ #else
+     7,  5, 10,  5,  9,  8,  4,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+@@ -417,6 +417,53 @@
+ #define MAX_STRING_WIDTH 16
+ #endif
+ 
++#ifdef SM64EX_FRENCH_TEXT
++enum FrenchDiacritic {
++    FR_DIA_NONE, FR_DIA_ACUTE, FR_DIA_GRAVE, FR_DIA_CIRCUMFLEX, FR_DIA_UMLAUT, FR_DIA_CEDILLA
++};
++
++static void render_us_fr_mark(enum FrenchDiacritic mark) {
++    if (mark == FR_DIA_NONE) return;
++
++    if (mark == FR_DIA_CEDILLA) {
++        create_dl_translation_matrix(MENU_MTX_PUSH, 0.0f, -7.0f, 0.0f);
++        render_generic_char(DIALOG_CHAR_COMMA);
++        gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
++        return;
++    }
++
++    if (mark == FR_DIA_UMLAUT) {
++        create_dl_translation_matrix(MENU_MTX_PUSH, -1.0f, 7.0f, 0.0f);
++        render_generic_char(DIALOG_CHAR_PERIOD);
++        gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
++        create_dl_translation_matrix(MENU_MTX_PUSH, 3.0f, 7.0f, 0.0f);
++        render_generic_char(DIALOG_CHAR_PERIOD);
++        gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
++        return;
++    }
++
++    if (mark == FR_DIA_CIRCUMFLEX) {
++        create_dl_translation_matrix(MENU_MTX_PUSH, -1.0f, 7.0f, 0.0f);
++        render_generic_char(ASCII_TO_DIALOG('\''));
++        gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
++        create_dl_translation_matrix(MENU_MTX_PUSH, 3.0f, 7.0f, 0.0f);
++        render_generic_char(ASCII_TO_DIALOG('\''));
++        gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
++        return;
++    }
++
++    create_dl_translation_matrix(MENU_MTX_PUSH, mark == FR_DIA_GRAVE ? -1.0f : 2.0f, 7.0f, 0.0f);
++    render_generic_char(ASCII_TO_DIALOG('\''));
++    gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
++}
++
++static void render_us_fr_diacritic(u8 base, enum FrenchDiacritic mark) {
++    render_generic_char(base);
++    render_us_fr_mark(mark);
++    create_dl_translation_matrix(MENU_MTX_NOPUSH, (f32)gDialogCharWidths[base], 0.0f, 0.0f);
++}
++#endif
++
+ /**
+  * Prints a generic white string.
+  * In JP/EU a IA1 texture is used but in US a IA4 texture is used.
+@@ -485,6 +532,36 @@
+                 render_lowercase_diacritic(&xCoord, &yCoord, DIALOG_CHAR_I_NO_DIA, str[strPos] & 0xF);
+                 break;
+ #else // i.e. not EU
++#ifdef SM64EX_FRENCH_TEXT
++            case DIALOG_CHAR_LOWER_A_GRAVE: render_us_fr_diacritic(ASCII_TO_DIALOG('a'), FR_DIA_GRAVE); break;
++            case DIALOG_CHAR_LOWER_A_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('a'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_LOWER_A_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('a'), FR_DIA_UMLAUT); break;
++            case DIALOG_CHAR_UPPER_A_GRAVE: render_us_fr_diacritic(ASCII_TO_DIALOG('A'), FR_DIA_GRAVE); break;
++            case DIALOG_CHAR_UPPER_A_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('A'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_UPPER_A_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('A'), FR_DIA_UMLAUT); break;
++            case DIALOG_CHAR_LOWER_E_GRAVE: render_us_fr_diacritic(ASCII_TO_DIALOG('e'), FR_DIA_GRAVE); break;
++            case DIALOG_CHAR_LOWER_E_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('e'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_LOWER_E_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('e'), FR_DIA_UMLAUT); break;
++            case DIALOG_CHAR_LOWER_E_ACUTE: render_us_fr_diacritic(ASCII_TO_DIALOG('e'), FR_DIA_ACUTE); break;
++            case DIALOG_CHAR_UPPER_E_GRAVE: render_us_fr_diacritic(ASCII_TO_DIALOG('E'), FR_DIA_GRAVE); break;
++            case DIALOG_CHAR_UPPER_E_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('E'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_UPPER_E_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('E'), FR_DIA_UMLAUT); break;
++            case DIALOG_CHAR_UPPER_E_ACUTE: render_us_fr_diacritic(ASCII_TO_DIALOG('E'), FR_DIA_ACUTE); break;
++            case DIALOG_CHAR_LOWER_U_GRAVE: render_us_fr_diacritic(ASCII_TO_DIALOG('u'), FR_DIA_GRAVE); break;
++            case DIALOG_CHAR_LOWER_U_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('u'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_LOWER_U_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('u'), FR_DIA_UMLAUT); break;
++            case DIALOG_CHAR_UPPER_U_GRAVE: render_us_fr_diacritic(ASCII_TO_DIALOG('U'), FR_DIA_GRAVE); break;
++            case DIALOG_CHAR_UPPER_U_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('U'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_UPPER_U_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('U'), FR_DIA_UMLAUT); break;
++            case DIALOG_CHAR_LOWER_O_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('o'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_LOWER_O_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('o'), FR_DIA_UMLAUT); break;
++            case DIALOG_CHAR_UPPER_O_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('O'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_UPPER_O_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('O'), FR_DIA_UMLAUT); break;
++            case DIALOG_CHAR_LOWER_I_CIRCUMFLEX: render_us_fr_diacritic(ASCII_TO_DIALOG('i'), FR_DIA_CIRCUMFLEX); break;
++            case DIALOG_CHAR_LOWER_I_UMLAUT: render_us_fr_diacritic(ASCII_TO_DIALOG('i'), FR_DIA_UMLAUT); break;
++            case 0xED: render_us_fr_diacritic(ASCII_TO_DIALOG('C'), FR_DIA_CEDILLA); break;
++            case 0xEE: render_us_fr_diacritic(ASCII_TO_DIALOG('c'), FR_DIA_CEDILLA); break;
++#endif
+             case DIALOG_CHAR_DAKUTEN:
+                 mark = DIALOG_MARK_DAKUTEN;
+                 break;
+diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/src/game/ingame_menu.h b/src/game/ingame_menu.h
+--- a/src/game/ingame_menu.h	2026-06-02 17:03:24.000000000 +0000
++++ b/src/game/ingame_menu.h	2026-09-26 14:37:09.443959409 +0000
+@@ -57,7 +57,7 @@
+ 
+ // definitions for some of the special characters defined in charmap.txt
+ enum DialogSpecialChars {
+-#ifdef VERSION_EU
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+     DIALOG_CHAR_LOWER_A_GRAVE = 0x60,      // 'a' grave
+     DIALOG_CHAR_LOWER_A_CIRCUMFLEX = 0x61, // 'a' circumflex
+     DIALOG_CHAR_LOWER_A_UMLAUT = 0x62,     // 'a' umlaut
