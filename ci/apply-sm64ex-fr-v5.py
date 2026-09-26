@@ -176,7 +176,52 @@ for i in range(0, 256, 4):
     lines.append("    " + ", ".join(f"{t:>38}" for t in tokens[i:i+4]) + ",")
 s = prefix + directive + "\n" + "\n".join(lines) + "\n" + suffix
 
-# Restore letters omitted from the US HUD LUT (notably V for VIDE).
+# Restore letters omitted from the US HUD LUT. The US ROM does not ship
+# RGBA16 HUD glyphs for J/Q/V/X/Z, so embed tiny 16x16 replacements rather
+# than pointing the LUT at identifiers which only exist in VERSION_EU.
+def rgba16_hud_texture(rows):
+    # 5x7 bitmap scaled 2x and centered in a 16x16 RGBA5551 texture.
+    pix = [[False for _ in range(16)] for _ in range(16)]
+    scale = 2
+    ox = 3
+    oy = 1
+    for yy, row in enumerate(rows):
+        for xx, bit in enumerate(row):
+            if bit == "1":
+                for dy in range(scale):
+                    for dx in range(scale):
+                        px = ox + xx * scale + dx
+                        py = oy + yy * scale + dy
+                        if 0 <= px < 16 and 0 <= py < 16:
+                            pix[py][px] = True
+    out = []
+    for y in range(16):
+        for x in range(16):
+            value = 0xFFFF if pix[y][x] else 0x0000
+            out.extend([(value >> 8) & 0xFF, value & 0xFF])
+    return out
+
+hud_patterns = {
+    "J": ["00111","00010","00010","00010","00010","10010","01100"],
+    "Q": ["01110","10001","10001","10001","10101","10010","01101"],
+    "V": ["10001","10001","10001","10001","10001","01010","00100"],
+    "X": ["10001","10001","01010","00100","01010","10001","10001"],
+    "Z": ["11111","00001","00010","00100","01000","10000","11111"],
+}
+hud_defs = []
+for letter, rows in hud_patterns.items():
+    vals = rgba16_hud_texture(rows)
+    body_rows = []
+    for i in range(0, len(vals), 16):
+        body_rows.append("    " + ", ".join(f"0x{v:02X}" for v in vals[i:i+16]) + ",")
+    hud_defs.append(
+        f"ALIGNED8 static const u8 texture_hud_char_fr_{letter}[] = {{\n"
+        + "\n".join(body_rows) + "\n};\n"
+    )
+
+hud_marker = "const u8 *const main_hud_lut[] = {"
+s = replace_once(s, hud_marker, "\n".join(hud_defs) + "\n" + hud_marker, "French HUD glyph insertion")
+
 hud_start = s.index("const u8 *const main_hud_lut[] = {")
 hud_end = s.index("};", hud_start)
 hud_block = s[hud_start:hud_end]
@@ -188,18 +233,18 @@ post = hud_block[u1:]
 udirective, ubody = us_section.split("\n", 1)
 utokens = [t.strip() for t in ubody.replace("\n", " ").split(",") if t.strip()]
 for idx, name in {
-    19:"texture_hud_char_J",
-    26:"texture_hud_char_Q",
-    31:"texture_hud_char_V",
-    33:"texture_hud_char_X",
-    35:"texture_hud_char_Z",
+    19:"texture_hud_char_fr_J",
+    26:"texture_hud_char_fr_Q",
+    31:"texture_hud_char_fr_V",
+    33:"texture_hud_char_fr_X",
+    35:"texture_hud_char_fr_Z",
 }.items():
     if idx >= len(utokens):
         raise SystemExit("US HUD LUT index out of range")
     utokens[idx] = name
 ulines = []
 for i in range(0, len(utokens), 4):
-    ulines.append("    " + ", ".join(f"{t:>32}" for t in utokens[i:i+4]) + ",")
+    ulines.append("    " + ", ".join(f"{t:>35}" for t in utokens[i:i+4]) + ",")
 new_hud_block = pre + udirective + "\n" + "\n".join(ulines) + "\n" + post
 s = s[:hud_start] + new_hud_block + s[hud_end:]
 p.write_text(s, encoding="utf-8")
