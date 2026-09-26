@@ -262,5 +262,13 @@ for old, new in replacements.items():
         raise SystemExit(f"layout anchor not found: {old[:60]!r}")
     s = s.replace(old, new, 1)
 
+center_scale_old = """#if defined(VERSION_JP) || defined(VERSION_EU) || defined(VERSION_SH)
+s16 get_str_x_pos_from_center_scale"""
+center_scale_new = """#if defined(VERSION_JP) || defined(VERSION_EU) || defined(VERSION_SH) || defined(SM64EX_FRENCH_TEXT)
+s16 get_str_x_pos_from_center_scale"""
+if center_scale_old not in s:
+    raise SystemExit("center-scale helper anchor not found")
+s = s.replace(center_scale_old, center_scale_new, 1)
+
 menu.write_text(s, encoding="utf-8")
 print("Applied deterministic French renderer v4.")
