@@ -65,8 +65,9 @@ jobs:
         shell: cmd
         run: |
           call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 -app_platform=UWP
+          set "VCPKG_ROOT=C:\vcpkg"
           cd /d "%GITHUB_WORKSPACE%\sm64ex-src\ports\uwp"
-          cmake --preset uwp-game-dll-release -DSM64EX_MSYS2_ROOT="%SM64EX_MSYS2_ROOT%" -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" -DSM64EX_VCPKG_ROOT="%VCPKG_ROOT%" -DSM64EX_SDL2_ROOT="%VCPKG_ROOT%\installed\x64-uwp"
+          cmake --preset uwp-game-dll-release -DSM64EX_MSYS2_ROOT="%SM64EX_MSYS2_ROOT%" -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" -DSM64EX_VCPKG_ROOT="C:/vcpkg" -DSM64EX_SDL2_ROOT="C:/vcpkg/installed/x64-uwp"
           cmake --build --preset uwp-game-dll-release
           cmake --preset uwp-package-release
           cmake --build --preset uwp-package-release
