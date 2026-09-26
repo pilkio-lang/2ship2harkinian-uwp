@@ -47,8 +47,7 @@ jobs:
           $patches = @(
             "$env:GITHUB_WORKSPACE\ci\sm64ex-ntsc-fr.patch",
             "$env:GITHUB_WORKSPACE\ci\sm64ex-ntsc-fr-part2.patch",
-            "$env:GITHUB_WORKSPACE\ci\sm64ex-fr-layout-v3.patch",
-            "$env:GITHUB_WORKSPACE\ci\sm64ex-fr-render-v4.patch"
+            "$env:GITHUB_WORKSPACE\ci\sm64ex-fr-layout-v3.patch"
           )
           foreach ($patch in $patches) {
             git apply --check $patch
@@ -56,6 +55,9 @@ jobs:
             git apply $patch
             if ($LASTEXITCODE -ne 0) { throw "Patch apply failed: $patch" }
           }
+
+          python "$env:GITHUB_WORKSPACE\ci\apply-sm64ex-fr-v4.py" "$PWD"
+          if ($LASTEXITCODE -ne 0) { throw "Deterministic French renderer transform failed." }
 
           git diff --check
           if ($LASTEXITCODE -ne 0) { throw "Patched source failed git diff --check." }
