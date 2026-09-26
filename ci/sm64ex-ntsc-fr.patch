@@ -1,28 +1,26 @@
-diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/bin/segment2.c b/bin/segment2.c
---- a/bin/segment2.c	2026-06-02 17:03:24.000000000 +0000
-+++ b/bin/segment2.c	2026-09-26 14:37:09.442522382 +0000
-@@ -2081,8 +2081,12 @@
+diff --git a/bin/segment2.c b/bin/segment2.c
+index a6756e9..5b80908 100644
+--- a/bin/segment2.c
++++ b/bin/segment2.c
+@@ -2081,7 +2081,7 @@ const u8 *const main_hud_camera_lut[] = {
  #if defined(VERSION_JP) || defined(VERSION_SH)
  #include "text/jp/define_text.inc.c"
  #elif defined(VERSION_US)
-+#ifdef SM64EX_FRENCH_TEXT
+-#include "text/us/define_text.inc.c"
 +#include "text/fr/define_text.inc.c"
-+#else
- #include "text/us/define_text.inc.c"
  #endif
-+#endif
  
  UNUSED static const u64 segment2_unused_0 = 0;
- 
-diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/include/text_strings.h.in b/include/text_strings.h.in
---- a/include/text_strings.h.in	2026-06-02 17:03:24.000000000 +0000
-+++ b/include/text_strings.h.in	2026-09-26 14:38:53.263032205 +0000
+diff --git a/include/text_strings.h.in b/include/text_strings.h.in
+index e5065c5..240b23f 100644
+--- a/include/text_strings.h.in
++++ b/include/text_strings.h.in
 @@ -232,7 +232,7 @@
  
  #endif
  
 -#ifdef VERSION_EU
-+#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
++#if defined(VERSION_EU) || defined(VERSION_US)
  
  /**
   * File Select Text
@@ -30,7 +28,7 @@ diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/include/t
   */
  // Main Courses
  // English, "R" text is different
-+#ifndef SM64EX_FRENCH_TEXT
++#if !defined(VERSION_US)
  #define TEXT_CAMERA_ANGLE_R             _("SET CAMERA ANGLE WITH [R]")
 +#endif
  // French
@@ -41,7 +39,7 @@ diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/include/t
  #endif // VERSION_EU
  
 +
-+#ifdef SM64EX_FRENCH_TEXT
++#ifdef VERSION_US
 +/* Fixed French UI strings for the NTSC-US Xbox build. */
 +#undef TEXT_CAMERA_ANGLE_R
 +#define TEXT_CAMERA_ANGLE_R TEXT_CAMERA_ANGLE_R_FR
@@ -191,13 +189,14 @@ diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/include/t
 +#define TEXT_THANK_YOU_MARIO TEXT_THANK_YOU_MARIO_FR
 +#undef TEXT_YES
 +#define TEXT_YES TEXT_YES_FR
-+#endif /* SM64EX_FRENCH_TEXT */
++#endif /* VERSION_US */
 +
  #endif // TEXT_STRINGS_H
-diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/ports/uwp/CMakeLists.txt b/ports/uwp/CMakeLists.txt
---- a/ports/uwp/CMakeLists.txt	2026-06-02 17:03:24.000000000 +0000
-+++ b/ports/uwp/CMakeLists.txt	2026-09-26 14:37:09.441547181 +0000
-@@ -349,6 +349,7 @@
+diff --git a/ports/uwp/CMakeLists.txt b/ports/uwp/CMakeLists.txt
+index 8a9045c..5c1fb46 100644
+--- a/ports/uwp/CMakeLists.txt
++++ b/ports/uwp/CMakeLists.txt
+@@ -349,6 +349,7 @@ target_compile_definitions(sm64ex_game PRIVATE
      NON_MATCHING=1
      AVOID_UB=1
      VERSION_US=1
@@ -205,14 +204,3 @@ diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/ports/uwp
      F3DEX_GBI_2E=1
      F3DEX_GBI_SHARED=1
      WINDOWS_BUILD=1
-diff -ruN '--exclude=XBOX_NTSC_FR.md' '--exclude=XBOX_NTSC_FR.patch' a/ports/uwp/Package.appxmanifest b/ports/uwp/Package.appxmanifest
---- a/ports/uwp/Package.appxmanifest	2026-06-02 17:03:24.000000000 +0000
-+++ b/ports/uwp/Package.appxmanifest	2026-09-26 14:43:26.260789890 +0000
-@@ -9,7 +9,7 @@
-   <Identity
-     Name="sm64ex.uwp"
-     Publisher="CN=Caorthann"
--    Version="1.0.0.0" />
-+    Version="1.0.0.1" />
- 
-   <mp:PhoneIdentity PhoneProductId="c09aaa57-3728-47a3-a6b9-d6f4e0943366" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
