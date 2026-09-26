@@ -124,6 +124,14 @@ s = once(s,
 ''',
 "French segment2 text")
 
+# Make the existing V texture declaration available to our French-on-US build.
+s = once(s,
+'''#if defined(VERSION_JP) || defined(VERSION_EU) || defined(VERSION_SH)
+ALIGNED8 static const u8 texture_hud_char_V[] = {''',
+'''#if defined(VERSION_JP) || defined(VERSION_EU) || defined(VERSION_SH) || defined(SM64EX_FRENCH_RENDERER)
+ALIGNED8 static const u8 texture_hud_char_V[] = {''',
+"HUD V texture declaration")
+
 # Restore the V glyph in the VERSION_US HUD LUT. The texture already exists;
 # US simply leaves its LUT slot null. French "VIDE" must render exactly where
 # the original game renders "NEW", using the same HUD pipeline and coordinates.
