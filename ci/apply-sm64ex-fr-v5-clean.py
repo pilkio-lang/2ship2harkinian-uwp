@@ -254,6 +254,9 @@ cedilla = mask([(3,12),(4,12),(4,13),(3,14),(2,15)])
 
 accent_code = f'''
 #ifdef SM64EX_FRENCH_RENDERER
+void change_and_flash_dialog_text_color_lines(s8 colorMode, s8 lineNum);
+void render_generic_dialog_char_at_pos(struct DialogEntry *dialog, s16 x, s16 y, u8 c);
+
 static const u8 sFrAccentGrave[64]      = {{ {pack(grave)} }};
 static const u8 sFrAccentAcute[64]      = {{ {pack(acute)} }};
 static const u8 sFrAccentCircumflex[64] = {{ {pack(circ)} }};
@@ -470,6 +473,14 @@ replacement = '''#endif
 pos = s.index("void handle_dialog_text_and_pages")
 bodypos = s.index(needle, pos)
 s = s[:bodypos] + replacement + s[bodypos + len(needle):]
+
+# Enable the upstream EU dialog coordinate transform without enabling VERSION_EU globally.
+s = once(s,
+'''#ifdef VERSION_EU
+void render_generic_dialog_char_at_pos(struct DialogEntry *dialog, s16 x, s16 y, u8 c) {''',
+'''#if defined(VERSION_EU) || defined(SM64EX_FRENCH_RENDERER)
+void render_generic_dialog_char_at_pos(struct DialogEntry *dialog, s16 x, s16 y, u8 c) {''',
+"EU dialog absolute renderer")
 
 # Center-scale helper is useful for French file select title.
 s = once(s,
