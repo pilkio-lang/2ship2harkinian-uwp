@@ -85,13 +85,18 @@ jobs:
             Select-Object -First 1
           if (-not $built) { throw "No MSIX/AppX package was produced." }
 
-          $sdkBin = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
-            Sort-Object Name -Descending |
+          $makeappxItem = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter makeappx.exe -File |
+            Where-Object { $_.FullName -match "\\x64\\makeappx\.exe$" } |
+            Sort-Object FullName -Descending |
             Select-Object -First 1
-          $makeappx = Join-Path $sdkBin.FullName "x64\makeappx.exe"
-          $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
-          if (!(Test-Path $makeappx)) { throw "makeappx.exe not found." }
-          if (!(Test-Path $signtool)) { throw "signtool.exe not found." }
+          $signtoolItem = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe -File |
+            Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $makeappxItem) { throw "makeappx.exe not found." }
+          if (-not $signtoolItem) { throw "signtool.exe not found." }
+          $makeappx = $makeappxItem.FullName
+          $signtool = $signtoolItem.FullName
 
           $unpack = Join-Path $env:GITHUB_WORKSPACE "repack"
           if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
