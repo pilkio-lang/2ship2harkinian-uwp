@@ -124,24 +124,8 @@ s = once(s,
 ''',
 "French segment2 text")
 
-# The large HUD font has V/X/Z/J/Q textures in the source, but the US LUT
-# deliberately leaves several of them null. French file-select needs V (VIDE).
-us_lut_old = '''    texture_hud_char_G, texture_hud_char_H, texture_hud_char_I,               0x0,
-    texture_hud_char_K, texture_hud_char_L, texture_hud_char_M, texture_hud_char_N,
-    texture_hud_char_O, texture_hud_char_P,               0x0, texture_hud_char_R,
-    texture_hud_char_S, texture_hud_char_T, texture_hud_char_U,               0x0,
-    texture_hud_char_W,               0x0, texture_hud_char_Y,               0x0,
-'''
-us_lut_new = '''    texture_hud_char_G, texture_hud_char_H, texture_hud_char_I, texture_hud_char_J,
-    texture_hud_char_K, texture_hud_char_L, texture_hud_char_M, texture_hud_char_N,
-    texture_hud_char_O, texture_hud_char_P, texture_hud_char_Q, texture_hud_char_R,
-    texture_hud_char_S, texture_hud_char_T, texture_hud_char_U, texture_hud_char_V,
-    texture_hud_char_W, texture_hud_char_X, texture_hud_char_Y, texture_hud_char_Z,
-'''
-# Replace only the VERSION_US table occurrence.
-us_idx = s.index("#elif defined(VERSION_US)")
-lut_idx = s.index(us_lut_old, us_idx)
-s = s[:lut_idx] + us_lut_new + s[lut_idx + len(us_lut_old):]
+# Keep the original VERSION_US HUD LUT unchanged. Long/unsupported French
+# labels are rendered with the complete small font instead.
 write(p, s)
 
 # ----------------------------------------------------------------------
@@ -499,6 +483,30 @@ write(p, s)
 # ----------------------------------------------------------------------
 p = "src/menu/file_select.c"
 s = read(p)
+
+s = once(s,
+'''    } else {
+        // Print "new" text
+        print_hud_lut_string(HUD_LUT_GLOBAL, x, y, LANGUAGE_ARRAY(textNew));
+    }
+''',
+'''    } else {
+#ifdef SM64EX_FRENCH_RENDERER
+        gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
+        print_generic_string(get_str_x_pos_from_center(x + 16, LANGUAGE_ARRAY(textNew), 10.0f),
+                             y + 4, LANGUAGE_ARRAY(textNew));
+        gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
+        gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
+        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
+#else
+        // Print "new" text
+        print_hud_lut_string(HUD_LUT_GLOBAL, x, y, LANGUAGE_ARRAY(textNew));
+#endif
+    }
+''',
+"VIDE small-font renderer")
 
 s = once(s,
 '''#ifndef VERSION_EU
