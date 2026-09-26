@@ -1,0 +1,243 @@
+--- a/src/game/ingame_menu.c
++++ b/src/game/ingame_menu.c
+@@ -426,33 +426,33 @@
+     if (mark == FR_DIA_NONE) return;
+ 
+     if (mark == FR_DIA_CEDILLA) {
+-        create_dl_translation_matrix(MENU_MTX_PUSH, 0.0f, -7.0f, 0.0f);
++        create_dl_translation_matrix(MENU_MTX_PUSH, 0.0f, -4.0f, 0.0f);
+         render_generic_char(DIALOG_CHAR_COMMA);
+         gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+         return;
+     }
+ 
+     if (mark == FR_DIA_UMLAUT) {
+-        create_dl_translation_matrix(MENU_MTX_PUSH, -1.0f, 7.0f, 0.0f);
++        create_dl_translation_matrix(MENU_MTX_PUSH, -1.0f, 4.0f, 0.0f);
+         render_generic_char(DIALOG_CHAR_PERIOD);
+         gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+-        create_dl_translation_matrix(MENU_MTX_PUSH, 3.0f, 7.0f, 0.0f);
++        create_dl_translation_matrix(MENU_MTX_PUSH, 3.0f, 4.0f, 0.0f);
+         render_generic_char(DIALOG_CHAR_PERIOD);
+         gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+         return;
+     }
+ 
+     if (mark == FR_DIA_CIRCUMFLEX) {
+-        create_dl_translation_matrix(MENU_MTX_PUSH, -1.0f, 7.0f, 0.0f);
+-        render_generic_char(ASCII_TO_DIALOG('\''));
+-        gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+-        create_dl_translation_matrix(MENU_MTX_PUSH, 3.0f, 7.0f, 0.0f);
++        // The US font has no standalone circumflex glyph. A single centered
++        // apostrophe is much more stable than drawing two full glyphs, which
++        // can intrude into adjacent lines on the 16-pixel US text grid.
++        create_dl_translation_matrix(MENU_MTX_PUSH, 1.0f, 4.0f, 0.0f);
+         render_generic_char(ASCII_TO_DIALOG('\''));
+         gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+         return;
+     }
+ 
+-    create_dl_translation_matrix(MENU_MTX_PUSH, mark == FR_DIA_GRAVE ? -1.0f : 2.0f, 7.0f, 0.0f);
++    create_dl_translation_matrix(MENU_MTX_PUSH, mark == FR_DIA_GRAVE ? 0.0f : 2.0f, 4.0f, 0.0f);
+     render_generic_char(ASCII_TO_DIALOG('\''));
+     gSPPopMatrix(gDisplayListHead++, G_MTX_MODELVIEW);
+ }
+--- a/src/menu/file_select.c
++++ b/src/menu/file_select.c
+@@ -1721,8 +1721,19 @@
+         int_to_str(starCount, starCountText);
+         print_hud_lut_string(HUD_LUT_GLOBAL, x + offset + 16, y, starCountText);
+     } else {
+-        // Print "new" text
++        // Print the empty-slot label. The US 16x16 HUD font does not contain
++        // every letter used by the French translation (notably V/Z), so the
++        // French-on-NTSC build uses the complete US small-font LUT here.
++#ifdef SM64EX_FRENCH_TEXT
++        gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
++        gSPDisplayList(gDisplayListHead++, dl_ia_text_begin);
++        print_generic_string(x, y + 4, LANGUAGE_ARRAY(textNew));
++        gSPDisplayList(gDisplayListHead++, dl_ia_text_end);
++        gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
++        gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
++#else
+         print_hud_lut_string(HUD_LUT_GLOBAL, x, y, LANGUAGE_ARRAY(textNew));
++#endif
+     }
+ }
+ 
+@@ -1852,22 +1863,29 @@
+  * Defines IDs for the top message of the score menu and displays it if the ID is called in messageID.
+  */
+ void score_menu_display_message(s8 messageID) {
+-#ifdef VERSION_EU
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+     s16 checkFileX, noSaveDataX;
+ #endif
+ 
+     switch (messageID) {
+         case SCORE_MSG_CHECK_FILE:
++#ifdef SM64EX_FRENCH_TEXT
++            checkFileX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textCheckFile), 10.0f);
++            print_generic_string_fade(checkFileX, 35, LANGUAGE_ARRAY(textCheckFile));
++#else
+ #ifdef VERSION_EU
+             checkFileX = get_str_x_pos_from_center_scale(160, LANGUAGE_ARRAY(textCheckFile), 12.0f);
+ #endif
+             print_hud_lut_string_fade(HUD_LUT_DIFF, CHECK_FILE_X, 35, LANGUAGE_ARRAY(textCheckFile));
++#endif
+             break;
+         case SCORE_MSG_NOSAVE_DATA:
+-#ifdef VERSION_EU
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+             noSaveDataX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textNoSavedDataExists), 10.0f);
+-#endif
++            print_generic_string_fade(noSaveDataX, 190, LANGUAGE_ARRAY(textNoSavedDataExists));
++#else
+             print_generic_string_fade(NOSAVE_DATA_X1, 190, LANGUAGE_ARRAY(textNoSavedDataExists));
++#endif
+             break;
+     }
+ }
+@@ -1983,32 +2001,44 @@
+  * Defines IDs for the top message of the copy menu and displays it if the ID is called in messageID.
+  */
+ void copy_menu_display_message(s8 messageID) {
+-#ifdef VERSION_EU
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+     s16 centeredX;
+ #endif
+ 
+     switch (messageID) {
+         case COPY_MSG_MAIN_TEXT:
+             if (sAllFilesExist == TRUE) {
+-#ifdef VERSION_EU
+-                centeredX = get_str_x_pos_from_center(160, textNoFileToCopyFrom[sLanguageMode], 10.0f);
+-#endif
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
++                centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textNoFileToCopyFrom), 10.0f);
++                print_generic_string_fade(centeredX, 190, LANGUAGE_ARRAY(textNoFileToCopyFrom));
++#else
+                 print_generic_string_fade(NOFILE_COPY_X, 190, LANGUAGE_ARRAY(textNoFileToCopyFrom));
++#endif
+             } else {
++#ifdef SM64EX_FRENCH_TEXT
++                centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textCopyFile), 10.0f);
++                print_generic_string_fade(centeredX, 35, LANGUAGE_ARRAY(textCopyFile));
++#else
+ #ifdef VERSION_EU
+                 centeredX = get_str_x_pos_from_center_scale(160, textCopyFile[sLanguageMode], 12.0f);
+ #endif
+                 print_hud_lut_string_fade(HUD_LUT_DIFF, COPY_FILE_X, 35, LANGUAGE_ARRAY(textCopyFile));
++#endif
+             }
+             break;
+         case COPY_MSG_COPY_WHERE:
+-#ifdef VERSION_EU
+-            centeredX = get_str_x_pos_from_center(160, textCopyItToWhere[sLanguageMode], 10.0f);
+-#endif
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
++            centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textCopyItToWhere), 10.0f);
++            print_generic_string_fade(centeredX, 190, LANGUAGE_ARRAY(textCopyItToWhere));
++#else
+             print_generic_string_fade(COPYIT_WHERE_X, 190, LANGUAGE_ARRAY(textCopyItToWhere));
++#endif
+             break;
+         case COPY_MSG_NOSAVE_EXISTS:
+-#ifdef VERSION_EU
++#ifdef SM64EX_FRENCH_TEXT
++            centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textNoSavedDataExists), 10.0f);
++            print_generic_string_fade(centeredX, 190, LANGUAGE_ARRAY(textNoSavedDataExists));
++#elif defined(VERSION_EU)
+             centeredX = get_str_x_pos_from_center(160, textNoSavedDataExists[sLanguageMode], 10.0f);
+             print_generic_string_fade(NOSAVE_DATA_X2, 190, textNoSavedDataExists[sLanguageMode]);
+ #else
+@@ -2016,16 +2046,20 @@
+ #endif
+             break;
+         case COPY_MSG_COPY_COMPLETE:
+-#ifdef VERSION_EU
+-            centeredX = get_str_x_pos_from_center(160, textCopyCompleted[sLanguageMode], 10.0f);
+-#endif
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
++            centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textCopyCompleted), 10.0f);
++            print_generic_string_fade(centeredX, 190, LANGUAGE_ARRAY(textCopyCompleted));
++#else
+             print_generic_string_fade(COPYCOMPLETE_X, 190, LANGUAGE_ARRAY(textCopyCompleted));
++#endif
+             break;
+         case COPY_MSG_SAVE_EXISTS:
+-#ifdef VERSION_EU
+-            centeredX = get_str_x_pos_from_center(160, textSavedDataExists[sLanguageMode], 10.0f);
+-#endif
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
++            centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textSavedDataExists), 10.0f);
++            print_generic_string_fade(centeredX, 190, LANGUAGE_ARRAY(textSavedDataExists));
++#else
+             print_generic_string_fade(SAVE_EXISTS_X1, 190, LANGUAGE_ARRAY(textSavedDataExists));
++#endif
+             break;
+     }
+ }
+@@ -2243,7 +2277,7 @@
+  * Defines IDs for the top message of the erase menu and displays it if the ID is called in messageID.
+  */
+ void erase_menu_display_message(s8 messageID) {
+-#ifdef VERSION_EU
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+     s16 centeredX;
+ #endif
+ 
+@@ -2257,33 +2291,44 @@
+ 
+     switch (messageID) {
+         case ERASE_MSG_MAIN_TEXT:
++#ifdef SM64EX_FRENCH_TEXT
++            centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textEraseFile), 10.0f);
++            print_generic_string_fade(centeredX, 35, LANGUAGE_ARRAY(textEraseFile));
++#else
+ #ifdef VERSION_EU
+             centeredX = get_str_x_pos_from_center_scale(160, textEraseFile[sLanguageMode], 12.0f);
+ #endif
+             print_hud_lut_string_fade(HUD_LUT_DIFF, ERASE_FILE_X, 35, LANGUAGE_ARRAY(textEraseFile));
++#endif
+             break;
+         case ERASE_MSG_PROMPT:
+             print_generic_string_fade(90, 190, LANGUAGE_ARRAY(textSure));
+             print_erase_menu_prompt(90, 190); // YES NO, has functions for it too
+             break;
+         case ERASE_MSG_NOSAVE_EXISTS:
+-#ifdef VERSION_EU
+-            centeredX = get_str_x_pos_from_center(160, textNoSavedDataExists[sLanguageMode], 10.0f);
+-#endif
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
++            centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textNoSavedDataExists), 10.0f);
++            print_generic_string_fade(centeredX, 190, LANGUAGE_ARRAY(textNoSavedDataExists));
++#else
+             print_generic_string_fade(NOSAVE_DATA_X3, 190, LANGUAGE_ARRAY(textNoSavedDataExists));
++#endif
+             break;
+         case ERASE_MSG_MARIO_ERASED:
+             LANGUAGE_ARRAY(textMarioAJustErased)[MARIO_ERASED_VAR] = sSelectedFileIndex + 10;
+-#ifdef VERSION_EU
+-            centeredX = get_str_x_pos_from_center(160, textMarioAJustErased[sLanguageMode], 10.0f);
+-#endif
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
++            centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textMarioAJustErased), 10.0f);
++            print_generic_string_fade(centeredX, 190, LANGUAGE_ARRAY(textMarioAJustErased));
++#else
+             print_generic_string_fade(MARIO_ERASED_X, 190, LANGUAGE_ARRAY(textMarioAJustErased));
++#endif
+             break;
+         case ERASE_MSG_SAVE_EXISTS: // unused
+-#ifdef VERSION_EU
+-            centeredX = get_str_x_pos_from_center(160, textSavedDataExists[sLanguageMode], 10.0f);
+-#endif
++#if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
++            centeredX = get_str_x_pos_from_center(160, LANGUAGE_ARRAY(textSavedDataExists), 10.0f);
++            print_generic_string_fade(centeredX, 190, LANGUAGE_ARRAY(textSavedDataExists));
++#else
+             print_generic_string_fade(SAVE_EXISTS_X2, 190, LANGUAGE_ARRAY(textSavedDataExists));
++#endif
+             break;
+     }
+ }
