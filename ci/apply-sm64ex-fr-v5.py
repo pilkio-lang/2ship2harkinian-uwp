@@ -135,6 +135,12 @@ s = repl(s,
 #if defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
 ''',
 "French accent enum")
+s = repl(s,
+'''#if defined(VERSION_JP) || defined(VERSION_EU)
+s16 get_str_x_pos_from_center_scale''',
+'''#if defined(VERSION_JP) || defined(VERSION_EU) || defined(SM64EX_FRENCH_TEXT)
+s16 get_str_x_pos_from_center_scale''',
+"scaled centering declaration")
 write(p, s)
 
 # ---------------------------------------------------------------------------
@@ -143,6 +149,19 @@ write(p, s)
 # ---------------------------------------------------------------------------
 p = "include/text_strings.h.in"
 s = read(p)
+s = repl(s,
+'''// English, "R" text is different
+#define TEXT_CAMERA_ANGLE_R             _("SET CAMERA ANGLE WITH [R]")
+// French
+''',
+'''// English, "R" text is different
+#ifndef SM64EX_FRENCH_TEXT
+#define TEXT_CAMERA_ANGLE_R             _("SET CAMERA ANGLE WITH [R]")
+#endif
+// French
+''',
+"camera string redefinition guard")
+
 s = repl(s,
 '''\n#ifdef VERSION_EU
 
