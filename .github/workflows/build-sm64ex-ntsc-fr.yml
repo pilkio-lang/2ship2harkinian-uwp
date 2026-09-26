@@ -142,6 +142,7 @@ jobs:
           & $signtool verify /pa /v $dest
           if ($LASTEXITCODE -ne 0) {
             Write-Warning "Signature is present, but its self-signed certificate is not trusted by the hosted runner. Shipping the .cer alongside the MSIX."
+            $global:LASTEXITCODE = 0
           }
 
           Remove-Item $pfx -Force
