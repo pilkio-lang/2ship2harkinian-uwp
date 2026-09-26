@@ -60,7 +60,6 @@ jobs:
         run: |
           call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 -app_platform=UWP
           if errorlevel 1 exit /b 1
-          set VCPKG_ROOT=%VCPKG_ROOT%
           cd /d "%GITHUB_WORKSPACE%\sm64ex\ports\uwp"
           cmake --preset uwp-game-dll-release -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" -DSM64EX_VCPKG_ROOT="%VCPKG_ROOT%" -DSM64EX_SDL2_ROOT="%VCPKG_ROOT%\installed\x64-uwp"
           if errorlevel 1 exit /b 1
@@ -118,18 +117,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "SignTool verification failed" }
 
           Remove-Item (Join-Path $out "sm64ex-NTSC-FR-devcert.pfx") -Force
-          @"
-sm64ex UWP NTSC-FR 1.0.0.1
-
-- Package identity: sm64ex.uwp
-- Publisher: CN=Caorthann
-- Architecture: x64
-- Keeps the NTSC-US UWP build and external US base.zip
-- French text layer enabled
-- Signed with a new self-signed development certificate (included as .cer)
-
-Try installing the MSIX over 1.0.0.0 first. If Xbox rejects the update because the signing certificate changed, uninstall 1.0.0.0 and install this build fresh. Your external E:\sm64ex assets remain separate from the app package.
-"@ | Set-Content (Join-Path $out "README_INSTALL.txt") -Encoding UTF8
+          $readme = @(
+            "sm64ex UWP NTSC-FR 1.0.0.1",
+            "",
+            "- Package identity: sm64ex.uwp",
+            "- Publisher: CN=Caorthann",
+            "- Architecture: x64",
+            "- Keeps the NTSC-US UWP build and external US base.zip",
+            "- French text layer enabled",
+            "- Signed with a new self-signed development certificate (included as .cer)",
+            "",
+            "Try installing the MSIX over 1.0.0.0 first.",
+            "If Xbox rejects the update because the signing certificate changed, uninstall 1.0.0.0 and install this build fresh.",
+            "Your external E:\sm64ex assets remain separate from the app package."
+          )
+          $readme | Set-Content (Join-Path $out "README_INSTALL.txt") -Encoding UTF8
 
       - name: Upload built package
         uses: actions/upload-artifact@v4
