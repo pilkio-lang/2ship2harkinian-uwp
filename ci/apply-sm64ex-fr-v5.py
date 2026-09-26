@@ -111,6 +111,13 @@ set_source_files_properties("${SM64EX_ROOT}/src/game/ingame_menu.c" PROPERTIES
     COMPILE_OPTIONS "/UVERSION_US"
     COMPILE_DEFINITIONS "VERSION_EU=1;SM64EX_FRENCH_TEXT=1"
 )
+
+# translation_fr.c must also see VERSION_EU so define_text.inc.c does not
+# emit the US-only debug table already provided by segment2.c.
+set_source_files_properties("${SM64EX_ROOT}/bin/eu/translation_fr.c" PROPERTIES
+    COMPILE_OPTIONS "/UVERSION_US"
+    COMPILE_DEFINITIONS "VERSION_EU=1"
+)
 '''
 s = replace_once(s, block, replacement, "CMake text renderer")
 p.write_text(s, encoding="utf-8")
