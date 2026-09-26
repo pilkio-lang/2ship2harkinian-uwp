@@ -122,6 +122,22 @@ set_source_files_properties("${SM64EX_ROOT}/bin/eu/translation_fr.c" PROPERTIES
 s = replace_once(s, block, replacement, "CMake text renderer")
 p.write_text(s, encoding="utf-8")
 
+# Force the translation table itself onto the EU preprocessor path even if
+# the target-wide VERSION_US define appears later on the compiler command line.
+p = root / "bin" / "eu" / "translation_fr.c"
+s = p.read_text(encoding="utf-8")
+eu_prefix = """#ifdef VERSION_US
+#undef VERSION_US
+#endif
+#ifndef VERSION_EU
+#define VERSION_EU 1
+#endif
+
+"""
+if not s.startswith(eu_prefix):
+    s = eu_prefix + s
+p.write_text(s, encoding="utf-8")
+
 # 3) Patch US font LUTs so the PAL renderer has French-specific glyph support.
 p = root / "bin" / "segment2.c"
 s = p.read_text(encoding="utf-8")
