@@ -58,7 +58,7 @@ jobs:
 
           if (-not (Select-String -Path "ports\uwp\CMakeLists.txt" -Pattern "translation_fr.c" -Quiet)) { throw "translation_fr.c missing." }
           if (-not (Select-String -Path "ports\uwp\CMakeLists.txt" -Pattern "/UVERSION_US" -Quiet)) { throw "EU renderer isolation missing." }
-          if (-not (Select-String -Path "bin\segment2.c" -Pattern "texture_font_char_fr_acute" -Quiet)) { throw "French accent glyphs missing." }
+          if (-not (Select-String -Path "src\game\ingame_menu.c" -Pattern "case 31: // V" -Quiet)) { throw "French HUD fallback is missing." }
       - name: Build text converter
         shell: msys2 {0}
         working-directory: sm64ex-src
