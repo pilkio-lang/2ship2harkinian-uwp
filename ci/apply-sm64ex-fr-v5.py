@@ -97,17 +97,17 @@ block = '''target_sources(sm64ex_game PRIVATE
     uwp/compat/uwp_local_folder.cpp
     uwp/compat/uwp_storage_root.c
     uwp/gfx/gfx_dxgi_uwp.cpp
-    \${SM64EX_GAME_SOURCES}
+    ${SM64EX_GAME_SOURCES}
 )
 '''
 replacement = block + '''
 # French text-only PAL presentation layer. The rest of the target stays US.
 target_sources(sm64ex_game PRIVATE
-    "\${SM64EX_ROOT}/bin/eu/translation_fr.c"
+    "${SM64EX_ROOT}/bin/eu/translation_fr.c"
 )
 
 # Compile only the text renderer through the EU presentation path.
-set_source_files_properties("\${SM64EX_ROOT}/src/game/ingame_menu.c" PROPERTIES
+set_source_files_properties("${SM64EX_ROOT}/src/game/ingame_menu.c" PROPERTIES
     COMPILE_OPTIONS "/UVERSION_US"
     COMPILE_DEFINITIONS "VERSION_EU=1;SM64EX_FRENCH_TEXT=1"
 )
