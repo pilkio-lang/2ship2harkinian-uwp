@@ -47,6 +47,19 @@ jobs:
 
           Expand-Archive -Path $zip -DestinationPath $env:GITHUB_WORKSPACE -Force
 
+      - name: Fix CMake SDK argument interpolation
+        shell: powershell
+        run: |
+          $path = ".\\SimpsonsGame_SeriesX_UWP_Autobuild\\bootstrap_build_package.ps1"
+          $text = Get-Content $path -Raw
+          $old = '-DCMAKE_SYSTEM_VERSION=$WindowsSDK'
+          $new = '"-DCMAKE_SYSTEM_VERSION=$WindowsSDK"'
+          if (-not $text.Contains($old)) {
+            throw "Expected CMAKE_SYSTEM_VERSION argument was not found."
+          }
+          $text = $text.Replace($old, $new)
+          [System.IO.File]::WriteAllText((Resolve-Path $path), $text, (New-Object System.Text.UTF8Encoding($false)))
+
       - name: Build and package UWP
         shell: powershell
         run: |
