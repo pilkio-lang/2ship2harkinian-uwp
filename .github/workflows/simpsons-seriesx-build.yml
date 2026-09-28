@@ -1,0 +1,39 @@
+name: Build Simpsons Game Series X UWP
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/simpsons-game-seriesx
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 330
+
+    steps:
+      - name: Checkout CI files
+        uses: actions/checkout@v4
+
+      - name: Ensure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Extract autobuild bundle
+        shell: powershell
+        run: |
+          Expand-Archive -Path .\SimpsonsGame_SeriesX_UWP_Autobuild.zip -DestinationPath . -Force
+
+      - name: Build and package UWP
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\SimpsonsGame_SeriesX_UWP_Autobuild\bootstrap_build_package.ps1 `
+            -WorkDir "$env:GITHUB_WORKSPACE\_simpsons_build"
+
+      - name: Upload Xbox package
+        uses: actions/upload-artifact@v4
+        with:
+          name: SimpsonsGame-SeriesX-0.0.1-dev
+          path: _simpsons_build/OUTPUT/*
+          if-no-files-found: error
