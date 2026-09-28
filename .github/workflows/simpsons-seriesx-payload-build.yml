@@ -1,0 +1,61 @@
+name: Build Simpsons Game Series X UWP Payload
+
+on:
+  push:
+    branches:
+      - ci/simpsons-game-seriesx-payload
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 330
+
+    steps:
+      - name: Checkout CI payload
+        uses: actions/checkout@v4
+
+      - name: Ensure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Reconstruct and verify autobuild bundle
+        shell: powershell
+        run: |
+          $parts = @(
+            ".\simpsons_payload\part0.b64",
+            ".\simpsons_payload\part1.b64",
+            ".\simpsons_payload\part2.b64",
+            ".\simpsons_payload\part3.b64"
+          )
+          $b64 = ""
+          foreach ($part in $parts) {
+            $b64 += (Get-Content $part -Raw).Trim()
+          }
+
+          $zip = Join-Path $env:GITHUB_WORKSPACE "SimpsonsGame_SeriesX_UWP_Autobuild.zip"
+          [System.IO.File]::WriteAllBytes($zip, [System.Convert]::FromBase64String($b64))
+
+          $expected = "2e47b03a93e6355fafb62706d45b0fbe066d3b4766c72250284bfe3923157dda"
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "Expected SHA256: $expected"
+          Write-Host "Actual   SHA256: $actual"
+          if ($actual -ne $expected) {
+            throw "Payload SHA256 mismatch."
+          }
+
+          Expand-Archive -Path $zip -DestinationPath $env:GITHUB_WORKSPACE -Force
+
+      - name: Build and package UWP
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\SimpsonsGame_SeriesX_UWP_Autobuild\bootstrap_build_package.ps1 `
+            -WorkDir "$env:GITHUB_WORKSPACE\_simpsons_build"
+
+      - name: Upload Xbox package
+        uses: actions/upload-artifact@v4
+        with:
+          name: SimpsonsGame-SeriesX-0.0.1-dev
+          path: _simpsons_build/OUTPUT/*
+          if-no-files-found: error
